@@ -1,0 +1,143 @@
+volumes:
+  n8n_storage:
+  postgres_storage:  # Mapeado a n8n_postgres_storage (volumen antiguo con workflows)
+  chroma_storage:
+
+networks:
+  pozos:
+    driver: bridge
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    hostname: postgres
+    networks: ['pozos']
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-magoreal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-n8n}
+    volumes:
+      - postgres_storage:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  n8n:
+    image: n8nio/n8n:2.0.2
+    container_name: n8n
+    hostname: n8n
+    networks: ['pozos']
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_USER_MANAGEMENT_JWT_SECRET: ${N8N_USER_MANAGEMENT_JWT_SECRET}
+
+      N8N_HOST: ${N8N_HOST}
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: https://${N8N_HOST}
+
+      NODE_ENV: production
+      TZ: America/La_Paz
+
+    volumes:
+      - n8n_storage:/home/node/.n8n
+      - ../shared:/data/shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  chroma:
+    image: chromadb/chroma:1.4.0
+    container_name: chroma
+    hostname: chroma
+    networks: ['pozos']
+    restart: unless-stopped
+    ports:
+      - "8008:8000"   # puedes quitar esto si no necesitas acceso externo
+    environment:
+      IS_PERSISTENT: "TRUE"
+      PERSIST_DIRECTORY: /chroma/chroma
+      ANONYMIZED_TELEMETRY: "FALSE"
+      TZ: America/La_Paz
+    volumes:
+      - chroma_storage:/chroma/chroma
+
+  gradio:
+    build:
+      context: ..
+      dockerfile: docker/gradio/Dockerfile
+    container_name: gradio
+    hostname: gradio
+    networks: ['pozos']
+    restart: unless-stopped
+    ports:
+      - "7860:7860"
+    environment:
+      CHROMA_HOST: ${CHROMA_HOST:-chroma}
+      CHROMA_PORT: ${CHROMA_PORT:-8000}
+      CHROMA_COLLECTION: ${CHROMA_COLLECTION:-pozos}
+      GRADIO_AUTH_USERNAME: ${GRADIO_AUTH_USERNAME:-admin}
+      GRADIO_AUTH_PASSWORD: ${GRADIO_AUTH_PASSWORD:-admin123}
+      ENV: ${ENV:-production}
+      DEBUG: ${DEBUG:-false}
+    depends_on:
+      chroma:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:7860')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api/Dockerfile
+    container_name: api
+    hostname: api
+    networks: ['pozos']
+    restart: unless-stopped
+    ports:
+      - "8009:8009"
+    environment:
+      API_HOST: ${API_HOST:-0.0.0.0}
+      API_PORT: ${API_PORT:-8009}
+      ENV: ${ENV:-production}
+      DEBUG: ${DEBUG:-false}
+      # Si necesitas conectarte a otros servicios:
+      # CHROMA_HOST: ${CHROMA_HOST:-chroma}
+      # CHROMA_PORT: ${CHROMA_PORT:-8000}
+      # POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      # POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+    depends_on:
+      - postgres
+      - chroma
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8009/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5

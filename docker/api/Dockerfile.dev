@@ -1,0 +1,26 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Actualizar pip primero
+RUN pip install --upgrade pip
+
+# Copiar requirements primero para aprovechar cache de Docker
+COPY src/api/requirements.txt /app/
+# Usar timeout más largo y retries para evitar problemas de red
+RUN pip install --no-cache-dir --progress-bar on \
+    --default-timeout=100 \
+    --retries 5 \
+    -r requirements.txt
+
+# En desarrollo, montamos el código como volumen
+# El comando se ejecuta desde docker-compose
+EXPOSE 8009
+
+CMD ["python", "main.py"]
+

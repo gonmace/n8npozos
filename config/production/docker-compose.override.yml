@@ -1,0 +1,16 @@
+# Override para producción
+# Usar con: docker-compose -f deploy/docker-compose.yml -f config/production/docker-compose.override.yml
+
+version: '3.8'
+
+services:
+  gradio:
+    build:
+      context: ..
+      dockerfile: docker/gradio/Dockerfile
+    environment:
+      ENV: production
+      DEBUG: "false"
+    restart: always
+    # No montar volúmenes en producción, usar imagen construida
+

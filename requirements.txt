@@ -1,0 +1,12 @@
+# Dependencias de producción
+# Gradio: Framework para crear interfaces web
+gradio>=4.0.0
+
+# ChromaDB: Cliente para base de datos vectorial
+chromadb>=0.4.0
+
+# OpenAI: Necesario para usar modelos de embedding de OpenAI (text-embedding-3-large)
+openai>=1.0.0
+
+# Requests: Necesario para healthcheck en Docker
+requests>=2.31.0

@@ -1,0 +1,29 @@
+# Override para desarrollo
+# Usar con: docker-compose -f deploy/docker-compose.yml -f config/development/docker-compose.override.yml
+# Ver: https://docs.docker.com/compose/extends/
+
+version: '3.8'
+
+services:
+  gradio:
+    build:
+      context: ..
+      dockerfile: docker/gradio/Dockerfile.dev
+    volumes:
+      - ../src/gradio:/app
+    environment:
+      ENV: development
+      DEBUG: "true"
+    command: python app.py
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api/Dockerfile.dev
+    volumes:
+      - ../src/api:/app
+    environment:
+      ENV: development
+      DEBUG: "true"
+    command: python main.py
+

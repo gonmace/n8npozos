@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@kernel.salacoste/n8n-workflow-builder": "^0.9.0"
+  }
+}

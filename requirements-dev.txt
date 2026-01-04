@@ -1,0 +1,16 @@
+# Incluir dependencias de producción
+-r requirements.txt
+
+# Dependencias de desarrollo (opcionales)
+# Testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Formateo y linting
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
+
+# Desarrollo interactivo
+ipython>=8.0.0
+
