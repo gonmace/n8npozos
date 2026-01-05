@@ -15,7 +15,6 @@ from chromadb_client import (
     get_collection_info,
     mmr_search
 )
-from rag_retriever import RAGRetriever, get_best_retriever
 
 # Configuración desde variables de entorno
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
@@ -204,6 +203,7 @@ class MMRRetrieveRequest(BaseModel):
     fetch_k: int = 20  # Número de documentos candidatos a recuperar inicialmente
     lambda_mult: float = 0.5  # Factor de diversidad (0.0 = solo relevancia, 1.0 = solo diversidad)
     filters: Optional[Dict[str, Any]] = None
+    min_score: float = 0.4  # Score mínimo de similitud para incluir un documento
 
 
 @app.post("/retrievers/collections/{collection_name}/mmr")
@@ -216,13 +216,14 @@ async def post_mmr_retrieve(
     
     MMR busca maximizar la relevancia mientras minimiza la redundancia entre documentos.
     Selecciona documentos que son relevantes al query pero diversos entre sí.
+    Solo retorna documentos con similarity_score >= min_score.
     
     Args:
         collection_name: Nombre de la colección
-        request: Request con query, k, fetch_k, lambda_mult y filtros opcionales
+        request: Request con query, k, fetch_k, lambda_mult, min_score y filtros opcionales
         
     Returns:
-        Dict con resultados de la búsqueda MMR
+        Dict con resultados de la búsqueda MMR filtrados por min_score
     """
     try:
         # Clean filters if provided
@@ -248,7 +249,8 @@ async def post_mmr_retrieve(
             k=request.k,
             fetch_k=request.fetch_k,
             lambda_mult=request.lambda_mult,
-            filters=cleaned_filters
+            filters=cleaned_filters,
+            min_score=request.min_score
         )
         
         return {
@@ -256,7 +258,8 @@ async def post_mmr_retrieve(
             "query": request.query,
             "results": result.get("results", []),
             "count": result.get("count", 0),
-            "search_type": result.get("search_type", "mmr_langchain")
+            "search_type": result.get("search_type", "mmr_langchain"),
+            "min_score": result.get("min_score", request.min_score)
         }
     except Exception as e:
         error_msg = str(e)

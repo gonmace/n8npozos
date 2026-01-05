@@ -160,18 +160,18 @@ def listar():
     """Listar todos los embeddings"""
     try:
         collection = get_or_create_collection()
-        data = collection.get(include=["documents", "metadatas"])
-        rows = []
+    data = collection.get(include=["documents", "metadatas"])
+    rows = []
         if data.get("ids"):
-            for i, doc in enumerate(data["documents"]):
+    for i, doc in enumerate(data["documents"]):
                 meta = data["metadatas"][i] if i < len(data["metadatas"]) else {}
-                rows.append([
-                    data["ids"][i],
-                    doc,
+        rows.append([
+            data["ids"][i],
+            doc,
                     meta.get("categoria", "") if meta else "",
                     meta.get("source", "") if meta else ""
-                ])
-        return rows
+        ])
+    return rows
     except Exception as e:
         error_msg = f"❌ Error al listar: {str(e)}"
         if DEBUG:
@@ -331,8 +331,8 @@ with gr.Blocks(title="Panel Admin - ChromaDB") as demo:
             with gr.Row():
                 listar_btn = gr.Button("🔄 Actualizar Lista", variant="secondary")
             
-            tabla = gr.Dataframe(
-                headers=["ID", "Texto", "Categoria", "Source"],
+    tabla = gr.Dataframe(
+        headers=["ID", "Texto", "Categoria", "Source"],
                 interactive=True,  # Permitir selección y copia de texto
                 wrap=True,
                 column_widths=["15%", "50%", "20%", "15%"],  # Texto es la columna más grande
@@ -434,10 +434,10 @@ with gr.Blocks(title="Panel Admin - ChromaDB") as demo:
             )
 
 if __name__ == "__main__":
-    demo.launch(
-        server_name="0.0.0.0",
+demo.launch(
+    server_name="0.0.0.0",
         server_port=GRADIO_SERVER_PORT,
         auth=(GRADIO_AUTH_USERNAME, GRADIO_AUTH_PASSWORD),
         share=False,
         show_error=DEBUG
-    )
+)

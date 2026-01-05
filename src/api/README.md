@@ -13,8 +13,19 @@ Microservicio de ejemplo implementado con FastAPI.
 
 ## Endpoints
 
+### Información y Health
 - `GET /` - Información del servicio
 - `GET /health` - Health check
+
+### ChromaDB Collections
+- `GET /chroma/collections` - Listar todas las colecciones
+- `GET /chroma/collections/{collection_name}` - Obtener vectores de una colección
+- `GET /chroma/collections/{collection_name}/info` - Información de una colección
+
+### Retrievers
+- `POST /retrievers/collections/{collection_name}/mmr` - Búsqueda MMR (Maximum Marginal Relevance)
+
+### Items (Ejemplo)
 - `GET /items` - Listar todos los items
 - `GET /items/{item_id}` - Obtener un item por ID
 - `POST /items` - Crear un nuevo item
@@ -90,7 +101,37 @@ Una vez iniciado, accede a:
 - Swagger UI: http://localhost:8009/docs
 - ReDoc: http://localhost:8009/redoc
 
-## Ejemplo de uso
+## Ejemplos de uso
+
+### Búsqueda MMR
+
+```bash
+# Búsqueda MMR en una colección
+curl -X POST "http://localhost:8009/retrievers/collections/pozos/mmr" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Warnes",
+    "k": 4,
+    "fetch_k": 20,
+    "lambda_mult": 0.5,
+    "filters": null
+  }'
+```
+
+### ChromaDB Collections
+
+```bash
+# Listar colecciones
+curl "http://localhost:8009/chroma/collections"
+
+# Obtener vectores de una colección
+curl "http://localhost:8009/chroma/collections/pozos"
+
+# Información de una colección
+curl "http://localhost:8009/chroma/collections/pozos/info"
+```
+
+### Items (Ejemplo)
 
 ```bash
 # Crear un item

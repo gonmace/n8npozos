@@ -8,8 +8,11 @@ chromadb>=1.4.0
 openai>=2.14.0
 
 # LangChain para MMR search
-langchain-community>=0.3.0
+langchain-chroma>=0.1.0
 langchain-openai>=0.1.0
+
+# Scikit-learn para cálculo de similitud coseno
+scikit-learn>=1.0.0
 
 # Si necesitas conectarte a otros servicios
 # requests>=2.31.0

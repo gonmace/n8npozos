@@ -7,27 +7,51 @@ import chromadb
 from chromadb.utils import embedding_functions
 from typing import List, Dict, Optional, Any
 import numpy as np
-from langchain_community.vectorstores import Chroma as LangChainChroma
+from sklearn.metrics.pairwise import cosine_similarity
+from langchain_chroma import Chroma as LangChainChroma
 from langchain_openai import OpenAIEmbeddings
 
 # Configuración desde variables de entorno
 # Detectar si estamos en Docker o desarrollo local
-if os.getenv("CHROMA_HOST"):
-    CHROMA_HOST = os.getenv("CHROMA_HOST")
+CHROMA_HOST_ENV = os.getenv("CHROMA_HOST")
+
+# Si CHROMA_HOST está explícitamente configurado, usarlo
+if CHROMA_HOST_ENV:
+    CHROMA_HOST = CHROMA_HOST_ENV
 else:
-    # Si estamos en Docker (archivo /proc/1/cgroup existe y contiene docker)
+    # Detectar si estamos en Docker
+    is_docker = False
     try:
+        # Método 1: Verificar /proc/1/cgroup
         with open("/proc/1/cgroup", "r") as f:
             if "docker" in f.read():
-                CHROMA_HOST = "chroma"  # Nombre del servicio Docker
-            else:
-                CHROMA_HOST = "localhost"  # Desarrollo local
+                is_docker = True
     except:
-        CHROMA_HOST = "localhost"  # Por defecto localhost
+        pass
+    
+    # Método 2: Verificar si el hostname es el nombre del servicio Docker
+    try:
+        import socket
+        hostname = socket.gethostname()
+        if hostname == "api":  # Nombre del contenedor API
+            is_docker = True
+    except:
+        pass
+    
+    if is_docker:
+        CHROMA_HOST = "chroma"  # Nombre del servicio Docker
+    else:
+        CHROMA_HOST = "localhost"  # Desarrollo local
 
 # Puerto: en desarrollo local con Docker, usar 8008 (puerto mapeado)
 # En Docker, usar 8000 (puerto interno)
-CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8008" if CHROMA_HOST == "localhost" else "8000"))
+CHROMA_PORT_ENV = os.getenv("CHROMA_PORT")
+if CHROMA_PORT_ENV:
+    CHROMA_PORT = int(CHROMA_PORT_ENV)
+else:
+    # Si estamos en Docker (hostname es "api"), usar puerto interno 8000
+    # Si no, usar puerto mapeado 8008
+    CHROMA_PORT = 8000 if CHROMA_HOST == "chroma" else 8008
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-large")
 
@@ -353,6 +377,7 @@ def mmr_search(
     fetch_k: int = 20,
     lambda_mult: float = 0.5,
     filters: Optional[Dict[str, Any]] = None,
+    min_score: float = 0.4,
 ) -> Dict[str, Any]:
     """
     Maximum Marginal Relevance (MMR) search usando LangChain con ChromaDB
@@ -367,9 +392,10 @@ def mmr_search(
         fetch_k: Número de documentos candidatos a recuperar inicialmente (default: 20)
         lambda_mult: Factor de diversidad (0.0 = solo relevancia, 1.0 = solo diversidad, default: 0.5)
         filters: Filtros opcionales para aplicar (default: None)
+        min_score: Score mínimo de similitud para incluir un documento (default: 0.4)
         
     Returns:
-        Dict con los resultados de la búsqueda MMR
+        Dict con los resultados de la búsqueda MMR filtrados por min_score
     """
     client_instance = _get_client()
     if client_instance is None:
@@ -393,17 +419,8 @@ def mmr_search(
             embedding_function=embeddings
         )
         
-        # Crear retriever MMR
-        retriever = vector_store.as_retriever(
-            search_type="mmr",
-            search_kwargs={
-                "k": k,
-                "fetch_k": fetch_k,
-                "lambda_mult": lambda_mult
-            }
-        )
-        
         # Limpiar filtros si se proporcionan
+        cleaned_filters = None
         if filters:
             cleaned_filters = {}
             for key, value in filters.items():
@@ -415,43 +432,118 @@ def mmr_search(
                             cleaned_filters[key] = value
                     else:
                         cleaned_filters[key] = value
-            
-            if cleaned_filters:
-                # Aplicar filtros usando el retriever
-                retriever = vector_store.as_retriever(
-                    search_type="mmr",
-                    search_kwargs={
-                        "k": k,
-                        "fetch_k": fetch_k,
-                        "lambda_mult": lambda_mult,
-                        "filter": cleaned_filters
-                    }
-                )
         
-        # Ejecutar búsqueda MMR
-        docs = retriever.invoke(query)
+        # Primero ejecutar MMR para obtener documentos diversificados
+        kwargs_mmr = {
+            "k": k,
+            "fetch_k": fetch_k,
+            "lambda_mult": lambda_mult
+        }
+        if cleaned_filters:
+            kwargs_mmr["filter"] = cleaned_filters
+        
+        # Obtener documentos MMR seleccionados
+        docs = vector_store.max_marginal_relevance_search(query, **kwargs_mmr)
+        
+        # Calcular scores de similitud para evaluar relevancia
+        # Obtener embedding del query
+        query_embedding = embeddings.embed_query(query)
+        query_embedding_np = np.array(query_embedding).reshape(1, -1)
+        
+        # Extraer IDs de los documentos MMR
+        doc_ids_from_mmr = []
+        for doc in docs:
+            doc_id = ""
+            if hasattr(doc, 'metadata') and doc.metadata:
+                metadata = doc.metadata if isinstance(doc.metadata, dict) else {}
+                doc_id = metadata.get('id') or metadata.get('_id') or metadata.get('doc_id') or ""
+            if not doc_id and hasattr(doc, 'id'):
+                doc_id = str(doc.id)
+            if doc_id:
+                doc_ids_from_mmr.append(doc_id)
+        
+        # Obtener embeddings desde ChromaDB y calcular similitud coseno
+        doc_scores_map = {}
+        if doc_ids_from_mmr:
+            try:
+                collection = get_collection(collection_name)
+                embeddings_result = collection.get(
+                    ids=doc_ids_from_mmr,
+                    include=["embeddings"]
+                )
+                
+                if embeddings_result and embeddings_result.get("ids"):
+                    for i, doc_id in enumerate(embeddings_result["ids"]):
+                        if i < len(embeddings_result.get("embeddings", [])):
+                            doc_emb = np.array(embeddings_result["embeddings"][i])
+                            doc_emb_np = doc_emb.reshape(1, -1)
+                            
+                            # Calcular similitud coseno
+                            similarity = cosine_similarity(query_embedding_np, doc_emb_np)[0][0]
+                            doc_scores_map[doc_id] = float(similarity)
+            except Exception as e:
+                print(f"⚠️  Error al calcular scores: {e}")
         
         # Procesar resultados
         processed_results = []
-        for doc in docs:
-            # Extraer metadata y score si están disponibles
-            metadata = doc.metadata if hasattr(doc, 'metadata') else {}
-            score = metadata.get('score', 0.0) if isinstance(metadata, dict) else 0.0
+        for i, doc in enumerate(docs):
+            # Extraer metadata
+            metadata = {}
+            if hasattr(doc, 'metadata') and doc.metadata:
+                metadata = doc.metadata if isinstance(doc.metadata, dict) else {}
             
-            # Obtener ID del documento
-            doc_id = metadata.get('id', '') if isinstance(metadata, dict) else ''
+            # Obtener ID del documento - puede estar en diferentes lugares
+            doc_id = ""
+            if isinstance(metadata, dict):
+                # Intentar diferentes campos comunes para ID
+                doc_id = metadata.get('id') or metadata.get('_id') or metadata.get('doc_id') or ""
             
-            processed_results.append({
-                "id": doc_id,
-                "document": doc.page_content if hasattr(doc, 'page_content') else str(doc),
-                "score": float(score),
-                "metadata": metadata if isinstance(metadata, dict) else {}
-            })
+            # Si no hay ID en metadata, intentar obtenerlo del documento directamente
+            if not doc_id and hasattr(doc, 'id'):
+                doc_id = str(doc.id)
+            
+            # Obtener el contenido del documento
+            document_content = ""
+            if hasattr(doc, 'page_content'):
+                document_content = doc.page_content
+            elif hasattr(doc, 'content'):
+                document_content = doc.content
+            else:
+                document_content = str(doc)
+            
+            # Obtener score de similitud para evaluar relevancia
+            similarity_score = doc_scores_map.get(doc_id, None) if doc_id else None
+            
+            # Limpiar metadata para remover campos internos de LangChain si es necesario
+            clean_metadata = {}
+            if isinstance(metadata, dict):
+                for key, value in metadata.items():
+                    # Excluir campos internos que no queremos exponer
+                    if not key.startswith('_') and key not in ['score', 'relevance_score', 'distance']:
+                        clean_metadata[key] = value
+            
+            result = {
+                "id": str(doc_id) if doc_id else f"doc_{i}",
+                "document": document_content,
+                "metadata": clean_metadata
+            }
+            
+            # Agregar score de similitud si está disponible
+            if similarity_score is not None:
+                result["similarity_score"] = similarity_score
+            
+            # Filtrar por min_score: solo incluir documentos con score >= min_score
+            if similarity_score is not None and similarity_score >= min_score:
+                processed_results.append(result)
+            elif similarity_score is None:
+                # Si no hay score disponible, incluir el documento (por compatibilidad)
+                processed_results.append(result)
         
         return {
             "results": processed_results,
             "count": len(processed_results),
-            "search_type": "mmr_langchain"
+            "search_type": "mmr_langchain",
+            "min_score": min_score
         }
     except Exception as e:
         raise Exception(f"Error en búsqueda MMR: {str(e)}")

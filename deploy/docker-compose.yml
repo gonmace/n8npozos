@@ -128,9 +128,12 @@ services:
       API_PORT: ${API_PORT:-8009}
       ENV: ${ENV:-production}
       DEBUG: ${DEBUG:-false}
-      # Si necesitas conectarte a otros servicios:
-      # CHROMA_HOST: ${CHROMA_HOST:-chroma}
-      # CHROMA_PORT: ${CHROMA_PORT:-8000}
+      # Configuración para conectarse a otros servicios
+      # En Docker, siempre usar el nombre del servicio y puerto interno
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8000
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-large}
       # POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       # POSTGRES_PORT: ${POSTGRES_PORT:-5432}
     depends_on:
