@@ -93,15 +93,22 @@ EMBEDDING_MODEL=text-embedding-3-large
 
 ### Paso 5: Importar datos de ChromaDB
 
+**⚠️ IMPORTANTE:** NO inicies los servicios Docker antes de importar los datos. El script de importación maneja todo automáticamente.
+
 ```bash
 # Importar el volumen de ChromaDB desde el backup
 ./scripts/import-chroma.sh /ruta/al/backup/chroma_YYYYMMDD_HHMMSS.tar.gz
 ```
 
-⚠️ **IMPORTANTE**: Este script:
-- Detendrá ChromaDB si está corriendo
-- Eliminará el volumen existente (si existe)
-- Restaurará los datos desde el backup
+**¿Qué hace el script?**
+- ✅ Detiene ChromaDB si está corriendo
+- ✅ Elimina contenedores y volúmenes existentes (con confirmación)
+- ✅ Crea un nuevo volumen
+- ✅ Restaura los datos desde el backup
+
+**Orden correcto:**
+1. **Primero**: Importar los datos (el script crea el volumen automáticamente)
+2. **Después**: Iniciar los servicios con `make prod`
 
 ### Paso 6: Construir y desplegar
 

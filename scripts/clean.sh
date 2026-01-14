@@ -12,7 +12,7 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
-docker-compose --env-file .env -f deploy/docker-compose.yml down -v --rmi all
+docker compose --env-file .env -f deploy/docker-compose.yml down -v --rmi all
 docker system prune -f
 
 echo "✅ Limpieza completada"

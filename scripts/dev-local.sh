@@ -60,7 +60,7 @@ echo "   - n8n (puerto 5678)"
 echo ""
 echo "📋 Opciones:"
 echo "   1. Usar Docker solo para servicios (PostgreSQL, ChromaDB, n8n):"
-echo "      docker-compose --env-file .env -f deploy/docker-compose.yml up -d postgres chroma n8n"
+echo "      docker compose --env-file .env -f deploy/docker-compose.yml up -d postgres chroma n8n"
 echo ""
 echo "   2. Ejecutar Gradio localmente:"
 echo "      python src/gradio/app.py"
@@ -113,7 +113,7 @@ if [ "$POSTGRES_RUNNING" = false ] || [ "$CHROMA_RUNNING" = false ] || [ "$N8N_R
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "🚀 Iniciando servicios..."
-        docker-compose --env-file .env -f deploy/docker-compose.yml up -d postgres chroma n8n
+        docker compose --env-file .env -f deploy/docker-compose.yml up -d postgres chroma n8n
         echo "⏳ Esperando a que los servicios estén listos..."
         sleep 8
         

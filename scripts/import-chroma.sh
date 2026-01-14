@@ -31,9 +31,11 @@ if docker ps -a | grep -q chroma; then
     docker rm chroma 2>/dev/null || true
 fi
 
-# Eliminar volumen existente si existe (¡CUIDADO! Esto borra datos existentes)
-if docker volume ls | grep -q chroma_storage; then
-    echo "⚠️  ADVERTENCIA: El volumen chroma_storage ya existe."
+# Buscar y eliminar volúmenes de ChromaDB existentes (¡CUIDADO! Esto borra datos existentes)
+CHROMA_VOLUMES=$(docker volume ls | grep -i chroma | awk '{print $2}')
+if [ -n "$CHROMA_VOLUMES" ]; then
+    echo "⚠️  ADVERTENCIA: Se encontraron volúmenes de ChromaDB existentes:"
+    echo "$CHROMA_VOLUMES" | sed 's/^/   - /'
     echo "   Esto sobrescribirá los datos existentes."
     read -p "   ¿Continuar? (s/N): " -n 1 -r
     echo
@@ -41,18 +43,27 @@ if docker volume ls | grep -q chroma_storage; then
         echo "❌ Operación cancelada"
         exit 1
     fi
-    echo "🗑️  Eliminando volumen existente..."
-    docker volume rm chroma_storage
+    echo "🗑️  Eliminando volúmenes existentes..."
+    echo "$CHROMA_VOLUMES" | while read vol; do
+        docker volume rm "$vol" 2>/dev/null || true
+    done
+fi
+
+# Determinar el nombre del volumen a crear (usar el mismo que está en docker-compose.yml)
+# Por defecto es chroma_storage, pero puede ser deploy_chroma_storage si se usa con prefijo
+VOLUME_NAME="chroma_storage"
+if docker compose --env-file .env -f deploy/docker-compose.yml config 2>/dev/null | grep -q "deploy_chroma_storage"; then
+    VOLUME_NAME="deploy_chroma_storage"
 fi
 
 # Crear nuevo volumen
-echo "📦 Creando nuevo volumen chroma_storage..."
-docker volume create chroma_storage
+echo "📦 Creando nuevo volumen $VOLUME_NAME..."
+docker volume create "$VOLUME_NAME"
 
 # Restaurar datos desde el backup
 echo "📥 Restaurando datos desde backup..."
 docker run --rm \
-    -v chroma_storage:/data \
+    -v ${VOLUME_NAME}:/data \
     -v "$(pwd)/$(dirname "$BACKUP_FILE")":/backup:ro \
     alpine sh -c "cd /data && tar xzf /backup/$(basename "$BACKUP_FILE")"
 
@@ -61,4 +72,4 @@ echo ""
 echo "🚀 Ahora puedes iniciar los servicios con:"
 echo "   make prod"
 echo "   O"
-echo "   docker-compose --env-file .env -f deploy/docker-compose.yml up -d chroma"
+echo "   docker compose --env-file .env -f deploy/docker-compose.yml up -d chroma"

@@ -29,32 +29,32 @@ backup: ## Crear backup de volúmenes
 	@./scripts/backup.sh
 
 logs: ## Ver logs de todos los servicios
-	docker-compose --env-file .env -f deploy/docker-compose.yml logs -f
+	docker compose --env-file .env -f deploy/docker-compose.yml logs -f
 
 logs-gradio: ## Ver logs de Gradio
-	docker-compose --env-file .env -f deploy/docker-compose.yml logs -f gradio
+	docker compose --env-file .env -f deploy/docker-compose.yml logs -f gradio
 
 logs-n8n: ## Ver logs de n8n
-	docker-compose --env-file .env -f deploy/docker-compose.yml logs -f n8n
+	docker compose --env-file .env -f deploy/docker-compose.yml logs -f n8n
 
 logs-api: ## Ver logs del microservicio API
-	docker-compose --env-file .env -f deploy/docker-compose.yml logs -f api
+	docker compose --env-file .env -f deploy/docker-compose.yml logs -f api
 
 shell-gradio: ## Abrir shell en contenedor de Gradio
-	docker-compose --env-file .env -f deploy/docker-compose.yml exec gradio /bin/bash
+	docker compose --env-file .env -f deploy/docker-compose.yml exec gradio /bin/bash
 
 shell-api: ## Abrir shell en contenedor del microservicio API
-	docker-compose --env-file .env -f deploy/docker-compose.yml exec api /bin/bash
+	docker compose --env-file .env -f deploy/docker-compose.yml exec api /bin/bash
 
 shell-postgres: ## Abrir shell en contenedor de PostgreSQL
-	docker-compose --env-file .env -f deploy/docker-compose.yml exec postgres psql -U $$(grep POSTGRES_USER .env | cut -d '=' -f2) -d $$(grep POSTGRES_DB .env | cut -d '=' -f2)
+	docker compose --env-file .env -f deploy/docker-compose.yml exec postgres psql -U $$(grep POSTGRES_USER .env | cut -d '=' -f2) -d $$(grep POSTGRES_DB .env | cut -d '=' -f2)
 
 shell-n8n: ## Abrir shell en contenedor de n8n
-	docker-compose --env-file .env -f deploy/docker-compose.yml exec n8n /bin/sh
+	docker compose --env-file .env -f deploy/docker-compose.yml exec n8n /bin/sh
 
 build: ## Construir imágenes Docker
-	docker-compose --env-file .env -f deploy/docker-compose.yml build --progress=plain
+	docker compose --env-file .env -f deploy/docker-compose.yml build --progress=plain
 
 rebuild: ## Reconstruir imágenes sin cache
-	docker-compose --env-file .env -f deploy/docker-compose.yml build --no-cache --progress=plain
+	docker compose --env-file .env -f deploy/docker-compose.yml build --no-cache --progress=plain
 

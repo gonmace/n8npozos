@@ -23,14 +23,14 @@ fi
 
 # Detener y eliminar contenedores existentes si existen
 echo "🧹 Limpiando contenedores existentes..."
-docker-compose --env-file .env -f deploy/docker-compose.yml -f config/development/docker-compose.override.yml down 2>/dev/null || true
+docker compose --env-file .env -f deploy/docker-compose.yml -f config/development/docker-compose.override.yml down 2>/dev/null || true
 
-# Usar docker-compose con override de desarrollo
+# Usar docker compose con override de desarrollo
 # --progress=plain muestra el output completo del build
 # --env-file .env asegura que se lean las variables desde la raíz
 echo "🔨 Construyendo imágenes..."
-docker-compose --env-file .env -f deploy/docker-compose.yml -f config/development/docker-compose.override.yml build --progress=plain
+docker compose --env-file .env -f deploy/docker-compose.yml -f config/development/docker-compose.override.yml build --progress=plain
 
 echo "🚀 Iniciando servicios..."
-docker-compose --env-file .env -f deploy/docker-compose.yml -f config/development/docker-compose.override.yml up
+docker compose --env-file .env -f deploy/docker-compose.yml -f config/development/docker-compose.override.yml up
 

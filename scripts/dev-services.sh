@@ -20,7 +20,7 @@ if [ ! -f .env ]; then
 fi
 
 # Iniciar PostgreSQL, ChromaDB y n8n
-docker-compose --env-file .env -f deploy/docker-compose.yml up -d postgres chroma n8n
+docker compose --env-file .env -f deploy/docker-compose.yml up -d postgres chroma n8n
 
 echo ""
 echo "✅ Servicios iniciados:"
@@ -29,8 +29,8 @@ echo "   - ChromaDB: localhost:8000"
 echo "   - n8n: http://localhost:5678"
 echo ""
 echo "💡 Para detener los servicios:"
-echo "   docker-compose --env-file .env -f deploy/docker-compose.yml stop postgres chroma n8n"
+echo "   docker compose --env-file .env -f deploy/docker-compose.yml stop postgres chroma n8n"
 echo ""
 echo "💡 Para ver logs:"
-echo "   docker-compose --env-file .env -f deploy/docker-compose.yml logs -f"
+echo "   docker compose --env-file .env -f deploy/docker-compose.yml logs -f"
 

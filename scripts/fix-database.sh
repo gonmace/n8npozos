@@ -17,7 +17,7 @@ source .env 2>/dev/null || true
 echo "1️⃣ Verificando estado de contenedores..."
 if ! docker ps | grep -q postgres; then
     echo "   ⚠️  PostgreSQL no está corriendo. Iniciando..."
-    docker-compose --env-file .env -f deploy/docker-compose.yml up -d postgres
+    docker compose --env-file .env -f deploy/docker-compose.yml up -d postgres
     echo "   ⏳ Esperando a que PostgreSQL esté listo..."
     sleep 10
 else
@@ -44,7 +44,7 @@ fi
 
 echo ""
 echo "4️⃣ Reiniciando n8n para reconectar..."
-docker-compose --env-file .env -f deploy/docker-compose.yml restart n8n
+docker compose --env-file .env -f deploy/docker-compose.yml restart n8n
 sleep 5
 
 echo ""
