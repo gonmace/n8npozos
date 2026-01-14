@@ -6,24 +6,38 @@ import chromadb
 from chromadb.utils import embedding_functions
 
 # Configuración desde variables de entorno
-# Detectar si estamos en Docker o desarrollo local
-# Si CHROMA_HOST no está configurado, detectar automáticamente
-if os.getenv("CHROMA_HOST"):
-    CHROMA_HOST = os.getenv("CHROMA_HOST")
+# En Docker, siempre usar el nombre del servicio y puerto interno
+# En desarrollo local, usar localhost y puerto mapeado
+
+# Primero verificar si las variables están explícitamente configuradas
+CHROMA_HOST_ENV = os.getenv("CHROMA_HOST")
+CHROMA_PORT_ENV = os.getenv("CHROMA_PORT")
+
+if CHROMA_HOST_ENV:
+    # Si CHROMA_HOST está configurado, usarlo directamente
+    CHROMA_HOST = CHROMA_HOST_ENV
+    CHROMA_PORT = int(CHROMA_PORT_ENV) if CHROMA_PORT_ENV else (8000 if CHROMA_HOST == "chroma" else 8008)
 else:
-    # Si estamos en Docker (archivo /proc/1/cgroup existe y contiene docker)
+    # Si no está configurado, detectar automáticamente si estamos en Docker
     try:
         with open("/proc/1/cgroup", "r") as f:
             if "docker" in f.read():
                 CHROMA_HOST = "chroma"  # Nombre del servicio Docker
+                CHROMA_PORT = int(CHROMA_PORT_ENV) if CHROMA_PORT_ENV else 8000  # Puerto interno de Docker
             else:
                 CHROMA_HOST = "localhost"  # Desarrollo local
+                CHROMA_PORT = int(CHROMA_PORT_ENV) if CHROMA_PORT_ENV else 8008  # Puerto mapeado
     except:
-        CHROMA_HOST = "localhost"  # Por defecto localhost
+        # Por defecto, asumir desarrollo local
+        CHROMA_HOST = "localhost"
+        CHROMA_PORT = int(CHROMA_PORT_ENV) if CHROMA_PORT_ENV else 8008
 
-# Puerto: en desarrollo local con Docker, usar 8008 (puerto mapeado)
-# En Docker, usar 8000 (puerto interno)
-CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8008" if CHROMA_HOST == "localhost" else "8000"))
+# Debug: mostrar configuración final y variables de entorno
+print(f"🔧 Configuración ChromaDB:")
+print(f"   CHROMA_HOST (env): {os.getenv('CHROMA_HOST', 'NO CONFIGURADO')}")
+print(f"   CHROMA_PORT (env): {os.getenv('CHROMA_PORT', 'NO CONFIGURADO')}")
+print(f"   CHROMA_HOST (final): {CHROMA_HOST}")
+print(f"   CHROMA_PORT (final): {CHROMA_PORT}")
 COLLECTION_NAME = os.getenv("CHROMA_COLLECTION", "pozos")
 GRADIO_AUTH_USERNAME = os.getenv("GRADIO_AUTH_USERNAME", "admin")
 GRADIO_AUTH_PASSWORD = os.getenv("GRADIO_AUTH_PASSWORD", "admin123")

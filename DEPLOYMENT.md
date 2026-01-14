@@ -56,8 +56,12 @@ git pull origin main  # o la rama que uses
 ### Paso 4: Configurar variables de entorno
 
 ```bash
-# Crear archivo .env si no existe
-cp .env.example .env  # Si tienes un ejemplo, o créalo manualmente
+# Crear archivo .env desde plantilla
+./scripts/create-env.sh
+
+# O crear manualmente:
+# cp .env.example .env  # Si existe
+# nano .env
 
 # Editar .env con tus valores de producción
 nano .env
