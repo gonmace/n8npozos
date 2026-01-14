@@ -73,7 +73,7 @@ echo ""
 POSTGRES_RUNNING=false
 CHROMA_RUNNING=false
 
-if docker ps 2>/dev/null | grep -q postgres; then
+if docker ps 2>/dev/null | grep -qE "(n8npozos-postgres|postgres)"; then
     POSTGRES_RUNNING=true
     echo "✅ PostgreSQL está corriendo en Docker"
 elif pg_isready -h localhost -p 5432 &>/dev/null 2>/dev/null; then
@@ -83,7 +83,7 @@ else
     echo "⚠️  PostgreSQL no está corriendo"
 fi
 
-if docker ps 2>/dev/null | grep -q chroma; then
+if docker ps 2>/dev/null | grep -qE "(n8npozos-chroma|chroma)"; then
     CHROMA_RUNNING=true
     echo "✅ ChromaDB está corriendo en Docker"
 elif curl -s http://localhost:8000/api/v1/heartbeat &>/dev/null 2>/dev/null; then

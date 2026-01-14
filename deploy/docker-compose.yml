@@ -11,7 +11,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: postgres
+    container_name: n8npozos-postgres
     hostname: postgres
     networks: ['pozos']
     restart: unless-stopped
@@ -31,7 +31,7 @@ services:
 
   n8n:
     image: n8nio/n8n:2.0.2
-    container_name: n8n
+    container_name: n8npozos-n8n
     hostname: n8n
     networks: ['pozos']
     restart: unless-stopped
@@ -72,7 +72,7 @@ services:
 
   chroma:
     image: chromadb/chroma:1.4.0
-    container_name: chroma
+    container_name: n8npozos-chroma
     hostname: chroma
     networks: ['pozos']
     restart: unless-stopped
@@ -90,7 +90,7 @@ services:
     build:
       context: ..
       dockerfile: docker/gradio/Dockerfile
-    container_name: gradio
+    container_name: n8npozos-gradio
     hostname: gradio
     networks: ['pozos']
     restart: unless-stopped
@@ -113,11 +113,12 @@ services:
       timeout: 10s
       retries: 5
 
+
   api:
     build:
       context: ..
       dockerfile: docker/api/Dockerfile
-    container_name: api
+    container_name: n8npozos-api
     hostname: api
     networks: ['pozos']
     restart: unless-stopped

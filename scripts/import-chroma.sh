@@ -20,13 +20,19 @@ fi
 echo "📦 Importando volumen de ChromaDB desde: $BACKUP_FILE"
 
 # Verificar que ChromaDB no esté corriendo
-if docker ps | grep -q chroma; then
+if docker ps | grep -q n8npozos-chroma; then
+    echo "🛑 Deteniendo contenedor ChromaDB..."
+    docker stop n8npozos-chroma
+elif docker ps | grep -q chroma; then
     echo "🛑 Deteniendo contenedor ChromaDB..."
     docker stop chroma
 fi
 
 # Eliminar contenedor si existe
-if docker ps -a | grep -q chroma; then
+if docker ps -a | grep -q n8npozos-chroma; then
+    echo "🗑️  Eliminando contenedor ChromaDB..."
+    docker rm n8npozos-chroma 2>/dev/null || true
+elif docker ps -a | grep -q chroma; then
     echo "🗑️  Eliminando contenedor ChromaDB..."
     docker rm chroma 2>/dev/null || true
 fi

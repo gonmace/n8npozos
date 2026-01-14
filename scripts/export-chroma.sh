@@ -47,7 +47,7 @@ fi
 
 # Detener ChromaDB si está corriendo para asegurar consistencia
 echo "🛑 Deteniendo contenedor ChromaDB (si está corriendo)..."
-docker stop chroma 2>/dev/null || true
+docker stop n8npozos-chroma 2>/dev/null || docker stop chroma 2>/dev/null || true
 
 # Crear backup del volumen
 echo "💾 Creando backup del volumen $VOLUME_NAME..."
@@ -57,7 +57,10 @@ docker run --rm \
     alpine tar czf /backup/chroma_${TIMESTAMP}.tar.gz -C /data .
 
 # Reiniciar ChromaDB si estaba corriendo
-if docker ps -a | grep -q chroma; then
+if docker ps -a | grep -q n8npozos-chroma; then
+    echo "🔄 Reiniciando ChromaDB..."
+    docker start n8npozos-chroma 2>/dev/null || true
+elif docker ps -a | grep -q chroma; then
     echo "🔄 Reiniciando ChromaDB..."
     docker start chroma 2>/dev/null || true
 fi
