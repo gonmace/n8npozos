@@ -1,12 +1,12 @@
 server {
     listen 80;
-    server_name n8n.magoreal.com;
+    server_name n8npozos.magoreal.com;
 
     # Tamaño máximo de payload (webhooks / archivos)
     client_max_body_size 50M;
 
     location / {
-        proxy_pass http://127.0.0.1:5678;
+        proxy_pass http://127.0.0.1:5679;
 
         proxy_http_version 1.1;
         proxy_set_header Host $host;
