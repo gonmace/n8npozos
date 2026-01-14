@@ -24,6 +24,12 @@ docker compose --env-file .env -f deploy/docker-compose.yml -f config/production
 echo "🚀 Iniciando servicios..."
 docker compose --env-file .env -f deploy/docker-compose.yml -f config/production/docker-compose.override.yml up -d
 
+# Esperar a que PostgreSQL esté listo y verificar/crear la base de datos
+echo "⏳ Esperando a que PostgreSQL esté listo..."
+sleep 5
+echo "🔧 Verificando base de datos..."
+./scripts/init-database.sh || echo "⚠️  Advertencia: No se pudo inicializar la base de datos automáticamente"
+
 echo "✅ Servicios iniciados en modo producción"
 echo "📊 Ver logs con: docker compose -f deploy/docker-compose.yml logs -f"
 

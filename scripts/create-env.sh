@@ -29,7 +29,7 @@ cat > "$ENV_FILE" << 'EOF'
 # =====================================================
 POSTGRES_USER=magoreal
 POSTGRES_PASSWORD=changeme_secure_password_here
-POSTGRES_DB=n8n
+POSTGRES_DB=pozos
 
 # =====================================================
 # N8N

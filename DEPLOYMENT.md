@@ -72,7 +72,7 @@ nano .env
 # PostgreSQL
 POSTGRES_USER=magoreal
 POSTGRES_PASSWORD=tu_password_seguro
-POSTGRES_DB=n8n
+POSTGRES_DB=pozos
 
 # N8N
 N8N_ENCRYPTION_KEY=tu_clave_de_encriptacion

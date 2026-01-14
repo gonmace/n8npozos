@@ -33,7 +33,7 @@ fi
 echo ""
 echo "2️⃣ Verificando conexión a la base de datos..."
 if [ -n "$POSTGRES_CONTAINER" ]; then
-    if docker exec $POSTGRES_CONTAINER psql -U ${POSTGRES_USER:-magoreal} -d ${POSTGRES_DB:-n8n} -c "SELECT 1;" >/dev/null 2>&1; then
+    if docker exec $POSTGRES_CONTAINER psql -U ${POSTGRES_USER:-magoreal} -d ${POSTGRES_DB:-pozos} -c "SELECT 1;" >/dev/null 2>&1; then
         echo "   ✅ Conexión exitosa"
     else
         echo "   ⚠️  Error de conexión. Verificando credenciales..."
@@ -45,7 +45,7 @@ fi
 
 echo ""
 echo "3️⃣ Verificando workflows..."
-WORKFLOWS=$(docker exec $POSTGRES_CONTAINER psql -U ${POSTGRES_USER:-magoreal} -d ${POSTGRES_DB:-n8n} -t -c "SELECT COUNT(*) FROM workflow_entity;" 2>/dev/null | xargs)
+WORKFLOWS=$(docker exec $POSTGRES_CONTAINER psql -U ${POSTGRES_USER:-magoreal} -d ${POSTGRES_DB:-pozos} -t -c "SELECT COUNT(*) FROM workflow_entity;" 2>/dev/null | xargs)
 if [ ! -z "$WORKFLOWS" ] && [ "$WORKFLOWS" != "0" ]; then
     echo "   ✅ Se encontraron $WORKFLOWS workflows"
 else

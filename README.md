@@ -162,7 +162,7 @@ Copia `.env.example` a `.env` y configura:
 # PostgreSQL
 POSTGRES_USER=magoreal
 POSTGRES_PASSWORD=your_secure_password
-POSTGRES_DB=n8n
+POSTGRES_DB=pozos
 
 # N8N
 N8N_ENCRYPTION_KEY=your_encryption_key
