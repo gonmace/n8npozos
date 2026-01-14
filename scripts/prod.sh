@@ -31,5 +31,6 @@ echo "🔧 Verificando base de datos..."
 ./scripts/init-database.sh || echo "⚠️  Advertencia: No se pudo inicializar la base de datos automáticamente"
 
 echo "✅ Servicios iniciados en modo producción"
-echo "📊 Ver logs con: docker compose -f deploy/docker-compose.yml logs -f"
+echo "📊 Ver logs con: make logs"
+echo "   O directamente: docker compose --env-file .env -f deploy/docker-compose.yml logs -f"
 
