@@ -43,22 +43,30 @@ done
 
 # Verificar si la base de datos existe
 echo "🔍 Verificando si la base de datos '$POSTGRES_DB' existe..."
-DB_EXISTS=$(docker exec $POSTGRES_CONTAINER psql -U $POSTGRES_USER -tAc "SELECT 1 FROM pg_database WHERE datname='$POSTGRES_DB'" postgres 2>/dev/null || echo "")
+# Usar PGPASSWORD para evitar problemas de autenticación
+export PGPASSWORD=$POSTGRES_PASSWORD
+DB_EXISTS=$(docker exec -e PGPASSWORD=$POSTGRES_PASSWORD $POSTGRES_CONTAINER psql -U $POSTGRES_USER -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$POSTGRES_DB'" 2>/dev/null || echo "")
 
 if [ -z "$DB_EXISTS" ] || [ "$DB_EXISTS" != "1" ]; then
     echo "📦 Creando base de datos '$POSTGRES_DB'..."
-    docker exec $POSTGRES_CONTAINER psql -U $POSTGRES_USER -c "CREATE DATABASE \"$POSTGRES_DB\";" postgres
-    echo "✅ Base de datos '$POSTGRES_DB' creada exitosamente"
+    docker exec -e PGPASSWORD=$POSTGRES_PASSWORD $POSTGRES_CONTAINER psql -U $POSTGRES_USER -d postgres -c "CREATE DATABASE \"$POSTGRES_DB\";"
+    if [ $? -eq 0 ]; then
+        echo "✅ Base de datos '$POSTGRES_DB' creada exitosamente"
+    else
+        echo "❌ Error al crear la base de datos '$POSTGRES_DB'"
+        exit 1
+    fi
 else
     echo "✅ La base de datos '$POSTGRES_DB' ya existe"
 fi
 
 # Verificar que la base de datos es accesible
 echo "🔍 Verificando acceso a la base de datos..."
-if docker exec $POSTGRES_CONTAINER psql -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT 1;" >/dev/null 2>&1; then
+if docker exec -e PGPASSWORD=$POSTGRES_PASSWORD $POSTGRES_CONTAINER psql -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT 1;" >/dev/null 2>&1; then
     echo "✅ Acceso a la base de datos verificado"
 else
-    echo "❌ Error: No se puede acceder a la base de datos"
+    echo "❌ Error: No se puede acceder a la base de datos '$POSTGRES_DB'"
+    echo "   Verifica que POSTGRES_USER y POSTGRES_PASSWORD sean correctos en .env"
     exit 1
 fi
 
