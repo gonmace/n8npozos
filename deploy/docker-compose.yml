@@ -16,7 +16,7 @@ services:
     networks: ['pozos']
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "5433:5432"  # Puerto externo 5433 para evitar conflictos
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-magoreal}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
