@@ -391,7 +391,10 @@ def mmr_search(
         k: Número final de documentos a retornar (default: 4)
         fetch_k: Número de documentos candidatos a recuperar inicialmente (default: 20)
         lambda_mult: Factor de diversidad (0.0 = solo relevancia, 1.0 = solo diversidad, default: 0.5)
-        filters: Filtros opcionales para aplicar (default: None)
+        filters: Filtros opcionales para aplicar sobre metadatos (default: None)
+                 Si es None o está vacío, se consideran TODOS los documentos sin filtrar.
+                 Ejemplo: {"categoria": "precio"} filtrará solo documentos con categoria="precio"
+                 Puede usar múltiples filtros: {"categoria": "precio", "tipo": "servicio"}
         min_score: Score mínimo de similitud para incluir un documento (default: 0.4)
         
     Returns:
@@ -419,31 +422,81 @@ def mmr_search(
             embedding_function=embeddings
         )
         
-        # Limpiar filtros si se proporcionan
+        # Limpiar y preparar filtros de metadatos si se proporcionan
         cleaned_filters = None
         if filters:
             cleaned_filters = {}
             for key, value in filters.items():
+                # Ignorar campos adicionales generados automáticamente
                 if key.startswith("additionalProp"):
                     continue
+                # Solo incluir valores válidos (no None, no vacíos)
                 if value is not None and value != "":
                     if isinstance(value, dict):
+                        # Si es un dict, solo incluir si no está vacío
+                        if value:
+                            cleaned_filters[key] = value
+                    elif isinstance(value, list):
+                        # Si es una lista, incluir si no está vacía
                         if value:
                             cleaned_filters[key] = value
                     else:
+                        # Para strings, números, booleans, etc., incluir directamente
                         cleaned_filters[key] = value
+            
+            # Si después de limpiar no quedan filtros válidos, tratar como None
+            if not cleaned_filters:
+                cleaned_filters = None
         
-        # Primero ejecutar MMR para obtener documentos diversificados
+        # Preparar parámetros para MMR search
         kwargs_mmr = {
             "k": k,
             "fetch_k": fetch_k,
             "lambda_mult": lambda_mult
         }
+        
+        # Aplicar filtros de metadatos si existen
+        # ChromaDB/LangChain espera filtros en formato: {"metadata_field": "value"}
+        # o {"metadata_field": {"$eq": "value"}} para operadores avanzados
+        chroma_filters = None
         if cleaned_filters:
-            kwargs_mmr["filter"] = cleaned_filters
+            # Convertir filtros simples al formato que ChromaDB espera
+            chroma_filters = {}
+            for key, value in cleaned_filters.items():
+                # Si el valor es un string simple, usar formato directo
+                # ChromaDB acepta: {"categoria": "precio"}
+                chroma_filters[key] = value
+            
+            kwargs_mmr["filter"] = chroma_filters
+            print(f"🔍 Aplicando filtros de metadatos: {chroma_filters}")
         
         # Obtener documentos MMR seleccionados
         docs = vector_store.max_marginal_relevance_search(query, **kwargs_mmr)
+        
+        # Verificar que los documentos obtenidos cumplan con los filtros (doble verificación)
+        # Esto asegura que incluso si LangChain no aplica los filtros correctamente, los filtramos manualmente
+        if chroma_filters and docs:
+            original_count = len(docs)
+            filtered_docs = []
+            for doc in docs:
+                doc_metadata = {}
+                if hasattr(doc, 'metadata') and doc.metadata:
+                    doc_metadata = doc.metadata if isinstance(doc.metadata, dict) else {}
+                
+                # Verificar que el documento cumpla con todos los filtros
+                matches_all_filters = True
+                for filter_key, filter_value in chroma_filters.items():
+                    doc_value = doc_metadata.get(filter_key)
+                    if doc_value != filter_value:
+                        matches_all_filters = False
+                        break
+                
+                if matches_all_filters:
+                    filtered_docs.append(doc)
+            
+            docs = filtered_docs
+            if len(filtered_docs) < original_count:
+                print(f"⚠️  Filtrado post-MMR: {original_count} documentos antes, {len(filtered_docs)} después de aplicar filtros")
         
         # Calcular scores de similitud para evaluar relevancia
         # Obtener embedding del query

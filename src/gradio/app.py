@@ -1,5 +1,6 @@
 import os
 import uuid
+import time
 import gradio as gr
 import chromadb
 from chromadb.utils import embedding_functions
@@ -47,9 +48,119 @@ else:
     )
     print(f"✅ Usando modelo de embedding: {EMBEDDING_MODEL}")
 
-# Inicializar cliente de ChromaDB con manejo de errores
+# Inicializar cliente de ChromaDB con manejo de errores y reintentos
+max_retries = 15  # Aumentar intentos para dar más tiempo a ChromaDB
+retry_delay = 4  # Aumentar tiempo de espera entre intentos (ChromaDB puede tardar en iniciar)
+
+# Función auxiliar para verificar si ChromaDB está listo antes de crear el cliente
+def _check_chromadb_ready(host: str, port: int) -> bool:
+    """Verifica si ChromaDB está listo para recibir conexiones"""
+    try:
+        import urllib.request
+        import urllib.error
+        # Intentar con v1 primero (puede estar deprecado pero aún responde)
+        url = f"http://{host}:{port}/api/v1/heartbeat"
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'ChromaDB-Health-Check')
+        try:
+            with urllib.request.urlopen(req, timeout=2) as response:
+                # Cualquier respuesta HTTP válida indica que ChromaDB está corriendo
+                return True
+        except urllib.error.HTTPError:
+            # HTTPError (4xx, 5xx) significa que el servidor respondió
+            # Esto indica que ChromaDB está corriendo y respondiendo
+            return True
+    except (urllib.error.URLError, OSError, ConnectionError, TimeoutError) as e:
+        # Solo retornar False si es un error de conexión real
+        error_str = str(e).lower()
+        if any(keyword in error_str for keyword in ["connection refused", "connection reset", "timeout", "errno 104", "errno 111"]):
+            return False
+        # Para otros errores desconocidos, asumir que no está listo
+        return False
+    except Exception:
+        # Cualquier otra excepción, asumir que no está listo
+        return False
+
+client = None
+for attempt in range(max_retries):
+    try:
+        # Primero verificar si ChromaDB está listo antes de intentar crear el cliente
+        if not _check_chromadb_ready(CHROMA_HOST, CHROMA_PORT):
+            if attempt < max_retries - 1:
+                print(f"⚠️  Intento {attempt + 1}/{max_retries}: ChromaDB aún no responde en {CHROMA_HOST}:{CHROMA_PORT}, esperando {retry_delay}s...")
+                time.sleep(retry_delay)
+                continue
+        
+        # Intentar crear el cliente
+        # Nota: ChromaDB puede intentar autenticarse durante la inicialización
+        # Si ChromaDB no tiene auth configurada, esto puede fallar temporalmente
+        # Usar Settings para evitar problemas de autenticación
+        try:
+            from chromadb.config import Settings
+            client = chromadb.HttpClient(
+                host=CHROMA_HOST,
+                port=CHROMA_PORT,
+                settings=Settings(anonymized_telemetry=False)
+            )
+        except (ImportError, TypeError, ValueError) as settings_error:
+            # Si Settings no está disponible o falla, usar método simple
+            # Si falla con ValueError (error de auth), capturarlo y reintentar
+            error_msg = str(settings_error)
+            if "Connection reset" in error_msg or "auth" in error_msg.lower():
+                # Si es un error de conexión o auth, reintentar
+                raise settings_error
+            client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+        
+        # Verificar que ChromaDB esté respondiendo intentando listar colecciones
+        # Esto también verifica que la conexión esté completamente establecida
+        # Esperar un poco antes de verificar para dar tiempo a ChromaDB
+        time.sleep(1)
+        try:
+            client.list_collections()
+        except Exception as verify_error:
+            # Si list_collections falla, puede ser que ChromaDB aún esté iniciando
+            # Intentar heartbeat como verificación alternativa
+            try:
+                client.heartbeat()
+            except Exception:
+                # Si ambos fallan, aún así mantener el cliente (puede funcionar para operaciones básicas)
+                # pero solo si no es un error de conexión
+                verify_error_msg = str(verify_error)
+                if "Connection reset" in verify_error_msg or "Connection refused" in verify_error_msg:
+                    raise verify_error  # Re-lanzar para que se maneje en el bloque externo
+        
+        if attempt > 0:
+            print(f"✅ Conectado a ChromaDB después de {attempt + 1} intentos")
+        break
+    except (ValueError, Exception) as e:
+        error_msg = str(e)
+        # Si es un error de conexión o autenticación, esperar y reintentar
+        if "Connection reset" in error_msg or "Connection refused" in error_msg or "Connection reset by peer" in error_msg or "auth/identity" in error_msg.lower():
+            if attempt < max_retries - 1:
+                print(f"⚠️  Intento {attempt + 1}/{max_retries} de conexión a ChromaDB falló (ChromaDB aún iniciando), reintentando en {retry_delay}s...")
+                time.sleep(retry_delay)
+            else:
+                print(f"\n❌ Error al conectar con ChromaDB en {CHROMA_HOST}:{CHROMA_PORT}")
+                print(f"   Error: {error_msg}")
+                print(f"\n💡 ChromaDB parece estar iniciando o no está respondiendo correctamente.")
+                print(f"   Verifica el estado:")
+                print(f"   - docker ps | grep chroma")
+                print(f"   - docker logs chroma --tail 20")
+                print(f"   - curl http://localhost:{CHROMA_PORT}/api/v1/heartbeat")
+                print(f"\n   Si ChromaDB está corriendo, espera unos segundos más y vuelve a intentar.")
+                raise
+        else:
+            # Para otros errores, también reintentar pero mostrar el error específico
+            if attempt < max_retries - 1:
+                print(f"⚠️  Intento {attempt + 1}/{max_retries} falló: {error_msg[:100]}...")
+                print(f"   Reintentando en {retry_delay}s...")
+                time.sleep(retry_delay)
+            else:
+                print(f"\n❌ Error al conectar con ChromaDB después de {max_retries} intentos")
+                print(f"   Error: {error_msg}")
+                raise
+
 try:
-    client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
     
     # Intentar crear o obtener la colección con el modelo de embedding especificado
     # Si la colección existe con un modelo diferente, eliminarla y crear una nueva
@@ -91,7 +202,8 @@ except Exception as e:
     print(f"\n💡 Asegúrate de que ChromaDB esté corriendo:")
     print(f"   - En Docker: docker-compose --env-file .env -f deploy/docker-compose.yml up -d chroma")
     print(f"   - O ejecuta: make dev-services")
-    print(f"   - Verifica el puerto: curl http://localhost:8000/api/v1/heartbeat o curl http://localhost:8008/api/v1/heartbeat")
+    print(f"   - Verifica el puerto: curl http://localhost:8008/api/v2/heartbeat")
+    print(f"   - Si ChromaDB está en Docker, espera unos segundos para que inicie completamente")
     raise
 
 def get_or_create_collection():
@@ -160,18 +272,18 @@ def listar():
     """Listar todos los embeddings"""
     try:
         collection = get_or_create_collection()
-    data = collection.get(include=["documents", "metadatas"])
-    rows = []
+        data = collection.get(include=["documents", "metadatas"])
+        rows = []
         if data.get("ids"):
-    for i, doc in enumerate(data["documents"]):
+            for i, doc in enumerate(data["documents"]):
                 meta = data["metadatas"][i] if i < len(data["metadatas"]) else {}
-        rows.append([
-            data["ids"][i],
-            doc,
+                rows.append([
+                    data["ids"][i],
+                    doc,
                     meta.get("categoria", "") if meta else "",
                     meta.get("source", "") if meta else ""
-        ])
-    return rows
+                ])
+        return rows
     except Exception as e:
         error_msg = f"❌ Error al listar: {str(e)}"
         if DEBUG:
@@ -331,8 +443,8 @@ with gr.Blocks(title="Panel Admin - ChromaDB") as demo:
             with gr.Row():
                 listar_btn = gr.Button("🔄 Actualizar Lista", variant="secondary")
             
-    tabla = gr.Dataframe(
-        headers=["ID", "Texto", "Categoria", "Source"],
+            tabla = gr.Dataframe(
+                headers=["ID", "Texto", "Categoria", "Source"],
                 interactive=True,  # Permitir selección y copia de texto
                 wrap=True,
                 column_widths=["15%", "50%", "20%", "15%"],  # Texto es la columna más grande
@@ -434,10 +546,10 @@ with gr.Blocks(title="Panel Admin - ChromaDB") as demo:
             )
 
 if __name__ == "__main__":
-demo.launch(
-    server_name="0.0.0.0",
+    demo.launch(
+        server_name="0.0.0.0",
         server_port=GRADIO_SERVER_PORT,
         auth=(GRADIO_AUTH_USERNAME, GRADIO_AUTH_PASSWORD),
         share=False,
         show_error=DEBUG
-)
+    )
