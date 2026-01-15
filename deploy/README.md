@@ -4,8 +4,7 @@ Este directorio contiene los archivos de configuración de Docker Compose para e
 
 ## Archivos
 
-- `docker-compose.yml` - Configuración principal del stack (n8n, PostgreSQL, ChromaDB, Gradio)
-- `docker-compose-pliego.yml` - Configuración alternativa para entorno "pliego"
+- `docker-compose.yml` - Configuración principal del stack (n8n, PostgreSQL, ChromaDB, Gradio, API)
 
 ## Uso
 

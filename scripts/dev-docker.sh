@@ -21,6 +21,9 @@ if [ ! -f .env ]; then
     fi
 fi
 
+# Crear directorio de ChromaDB si no existe
+./scripts/init-chroma-dir.sh
+
 # Detener y eliminar contenedores existentes si existen
 echo "🧹 Limpiando contenedores existentes..."
 docker compose --env-file .env -f deploy/docker-compose.yml -f config/development/docker-compose.override.yml down 2>/dev/null || true

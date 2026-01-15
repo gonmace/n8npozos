@@ -1,5 +1,6 @@
 #!/bin/bash
-# Script para exportar el volumen de ChromaDB desde el servidor local
+# Script para exportar ChromaDB desde el servidor local
+# Ahora usa bind mount (directorio) en lugar de volumen Docker
 # Uso: ./scripts/export-chroma.sh [ruta_destino]
 
 set -e
@@ -10,51 +11,43 @@ BACKUP_FILE="${BACKUP_DIR}/chroma_${TIMESTAMP}.tar.gz"
 
 mkdir -p "$BACKUP_DIR"
 
-echo "📦 Exportando volumen de ChromaDB..."
+echo "📦 Exportando ChromaDB..."
 
-# Buscar el volumen de ChromaDB (puede tener diferentes nombres según el proyecto)
-VOLUME_NAME=""
-
-# Primero buscar volúmenes con "chroma" en el nombre (más flexible)
-CHROMA_VOLUMES=$(docker volume ls | grep -i chroma | awk '{print $2}')
-if [ -n "$CHROMA_VOLUMES" ]; then
-    # Si hay múltiples, preferir chroma_storage, sino tomar el primero
-    if echo "$CHROMA_VOLUMES" | grep -q "^chroma_storage$"; then
-        VOLUME_NAME="chroma_storage"
-    else
-        VOLUME_NAME=$(echo "$CHROMA_VOLUMES" | head -1)
-        echo "⚠️  Usando volumen encontrado: $VOLUME_NAME"
-    fi
+# Buscar el directorio de ChromaDB
+CHROMA_DIR=""
+if [ -d "./chroma_storage" ]; then
+    CHROMA_DIR="./chroma_storage"
+elif [ -d "./deploy/chroma_storage" ]; then
+    CHROMA_DIR="./deploy/chroma_storage"
+elif [ -d "../chroma_storage" ]; then
+    CHROMA_DIR="../chroma_storage"
+else
+    echo "❌ Error: Directorio de ChromaDB no encontrado"
+    echo ""
+    echo "💡 Buscando directorios chroma_storage..."
+    find . -type d -name "chroma_storage" 2>/dev/null | head -5
+    echo ""
+    echo "   Si ChromaDB está usando un volumen Docker, primero migra a bind mount:"
+    echo "   1. Detén ChromaDB: docker stop n8npozos-chroma"
+    echo "   2. Copia el volumen a un directorio:"
+    echo "      docker run --rm -v chroma_storage:/data -v \$(pwd):/backup alpine tar czf /backup/chroma_storage.tar.gz -C /data ."
+    echo "   3. Extrae: mkdir -p chroma_storage && tar xzf chroma_storage.tar.gz -C chroma_storage"
+    exit 1
 fi
 
-# Si no se encontró ningún volumen de ChromaDB
-if [ -z "$VOLUME_NAME" ]; then
-    echo "📋 Volúmenes disponibles:"
-    docker volume ls
-    echo ""
-    echo "❌ Error: Volumen de ChromaDB no encontrado"
-    echo ""
-    echo "💡 Opciones:"
-    echo "   1. Si ChromaDB está corriendo con docker compose, ejecuta primero:"
-    echo "      docker compose --env-file .env -f deploy/docker-compose.yml up -d chroma"
-    echo ""
-    echo "   2. Si los datos están en otro lugar, especifica el nombre del volumen:"
-    echo "      docker volume ls  # para ver los volúmenes disponibles"
-    echo ""
-    echo "   3. Si ChromaDB está en el VPS, ejecuta este script en el VPS, no aquí"
-    exit 1
+# Verificar que el directorio no esté vacío
+if [ ! "$(ls -A $CHROMA_DIR 2>/dev/null)" ]; then
+    echo "⚠️  Advertencia: El directorio $CHROMA_DIR está vacío"
+    echo "   ¿ChromaDB se ha inicializado correctamente?"
 fi
 
 # Detener ChromaDB si está corriendo para asegurar consistencia
 echo "🛑 Deteniendo contenedor ChromaDB (si está corriendo)..."
 docker stop n8npozos-chroma 2>/dev/null || docker stop chroma 2>/dev/null || true
 
-# Crear backup del volumen
-echo "💾 Creando backup del volumen $VOLUME_NAME..."
-docker run --rm \
-    -v ${VOLUME_NAME}:/data:ro \
-    -v "$(pwd)/$BACKUP_DIR":/backup \
-    alpine tar czf /backup/chroma_${TIMESTAMP}.tar.gz -C /data .
+# Crear backup del directorio
+echo "💾 Creando backup del directorio $CHROMA_DIR..."
+tar czf "$BACKUP_FILE" -C "$(dirname "$CHROMA_DIR")" "$(basename "$CHROMA_DIR")"
 
 # Reiniciar ChromaDB si estaba corriendo
 if docker ps -a | grep -q n8npozos-chroma; then
@@ -69,6 +62,6 @@ echo "✅ Backup creado: $BACKUP_FILE"
 echo "📊 Tamaño: $(du -h "$BACKUP_FILE" | cut -f1)"
 echo ""
 echo "📤 Para transferir al VPS, puedes usar:"
-echo "   scp $BACKUP_FILE usuario@vps:/ruta/destino/"
+echo "   scp $BACKUP_FILE magoreal@vmi2527689.contaboserver.net:~/n8n_pozos/chroma-backup/"
 echo "   O usar rsync para transferencia más eficiente:"
-echo "   rsync -avz --progress $BACKUP_FILE usuario@vps:/ruta/destino/"
+echo "   rsync -avz --progress $BACKUP_FILE magoreal@vmi2527689.contaboserver.net:~/n8n_pozos/chroma-backup/"

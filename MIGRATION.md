@@ -27,8 +27,7 @@ Esta guía explica los cambios realizados en la estructura del proyecto.
 │       ├── Dockerfile
 │       └── Dockerfile.dev
 ├── deploy/
-│   ├── docker-compose.yml
-│   └── docker-compose-pliego.yml
+│   └── docker-compose.yml
 ├── config/
 │   ├── development/
 │   │   └── docker-compose.override.yml
@@ -84,7 +83,6 @@ docker-compose -f deploy/docker-compose.yml -f config/production/docker-compose.
 
 - `gradio/app.py` → `src/gradio/app.py`
 - `docker-compose.yml` → `deploy/docker-compose.yml`
-- `docker-compose-pliego.yml` → `deploy/docker-compose-pliego.yml`
 - Las referencias a `./gradio` ahora son `./src/gradio`
 
 ## Pasos para Migrar

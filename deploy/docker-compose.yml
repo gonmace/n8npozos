@@ -1,7 +1,7 @@
 volumes:
   n8n_storage:
   postgres_storage:  # Mapeado a n8n_postgres_storage (volumen antiguo con workflows)
-  chroma_storage:
+  # chroma_storage:  # Ahora usando bind mount ./chroma_storage
 
 networks:
   pozos:
@@ -80,11 +80,11 @@ services:
       - "8008:8000"   # puedes quitar esto si no necesitas acceso externo
     environment:
       IS_PERSISTENT: "TRUE"
-      PERSIST_DIRECTORY: /chroma/chroma
+      PERSIST_DIRECTORY: /data
       ANONYMIZED_TELEMETRY: "FALSE"
       TZ: America/La_Paz
     volumes:
-      - chroma_storage:/chroma/chroma
+      - ./chroma_storage:/data  # Directorio relativo a deploy/
 
   gradio:
     build:
@@ -102,6 +102,8 @@ services:
       CHROMA_COLLECTION: ${CHROMA_COLLECTION:-pozos}
       GRADIO_AUTH_USERNAME: ${GRADIO_AUTH_USERNAME:-admin}
       GRADIO_AUTH_PASSWORD: ${GRADIO_AUTH_PASSWORD:-admin123}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-large}
       ENV: ${ENV:-production}
       DEBUG: ${DEBUG:-false}
     depends_on:

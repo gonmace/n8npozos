@@ -1,5 +1,6 @@
 #!/bin/bash
-# Script para importar el volumen de ChromaDB en el VPS
+# Script para importar ChromaDB en el VPS
+# Ahora usa bind mount (directorio) en lugar de volumen Docker
 # Uso: ./scripts/import-chroma.sh [ruta_backup.tar.gz]
 
 set -e
@@ -17,7 +18,13 @@ if [ ! -f "$BACKUP_FILE" ]; then
     exit 1
 fi
 
-echo "📦 Importando volumen de ChromaDB desde: $BACKUP_FILE"
+echo "📦 Importando ChromaDB desde: $BACKUP_FILE"
+
+# Determinar el directorio de destino
+CHROMA_DIR="./chroma_storage"
+if [ -d "./deploy/chroma_storage" ]; then
+    CHROMA_DIR="./deploy/chroma_storage"
+fi
 
 # Verificar que ChromaDB no esté corriendo
 if docker ps | grep -q n8npozos-chroma; then
@@ -37,11 +44,9 @@ elif docker ps -a | grep -q chroma; then
     docker rm chroma 2>/dev/null || true
 fi
 
-# Buscar y eliminar volúmenes de ChromaDB existentes (¡CUIDADO! Esto borra datos existentes)
-CHROMA_VOLUMES=$(docker volume ls | grep -i chroma | awk '{print $2}')
-if [ -n "$CHROMA_VOLUMES" ]; then
-    echo "⚠️  ADVERTENCIA: Se encontraron volúmenes de ChromaDB existentes:"
-    echo "$CHROMA_VOLUMES" | sed 's/^/   - /'
+# Verificar si el directorio ya existe
+if [ -d "$CHROMA_DIR" ] && [ "$(ls -A $CHROMA_DIR 2>/dev/null)" ]; then
+    echo "⚠️  ADVERTENCIA: El directorio $CHROMA_DIR ya existe y contiene datos."
     echo "   Esto sobrescribirá los datos existentes."
     read -p "   ¿Continuar? (s/N): " -n 1 -r
     echo
@@ -49,31 +54,27 @@ if [ -n "$CHROMA_VOLUMES" ]; then
         echo "❌ Operación cancelada"
         exit 1
     fi
-    echo "🗑️  Eliminando volúmenes existentes..."
-    echo "$CHROMA_VOLUMES" | while read vol; do
-        docker volume rm "$vol" 2>/dev/null || true
-    done
+    echo "🗑️  Eliminando directorio existente..."
+    rm -rf "$CHROMA_DIR"
 fi
 
-# Determinar el nombre del volumen a crear (usar el mismo que está en docker-compose.yml)
-# Por defecto es chroma_storage, pero puede ser deploy_chroma_storage si se usa con prefijo
-VOLUME_NAME="chroma_storage"
-if docker compose --env-file .env -f deploy/docker-compose.yml config 2>/dev/null | grep -q "deploy_chroma_storage"; then
-    VOLUME_NAME="deploy_chroma_storage"
-fi
-
-# Crear nuevo volumen
-echo "📦 Creando nuevo volumen $VOLUME_NAME..."
-docker volume create "$VOLUME_NAME"
+# Crear directorio de destino
+echo "📦 Creando directorio de destino: $CHROMA_DIR"
+mkdir -p "$(dirname "$CHROMA_DIR")"
 
 # Restaurar datos desde el backup
 echo "📥 Restaurando datos desde backup..."
-docker run --rm \
-    -v ${VOLUME_NAME}:/data \
-    -v "$(pwd)/$(dirname "$BACKUP_FILE")":/backup:ro \
-    alpine sh -c "cd /data && tar xzf /backup/$(basename "$BACKUP_FILE")"
+tar xzf "$BACKUP_FILE" -C "$(dirname "$CHROMA_DIR")"
 
-echo "✅ Datos de ChromaDB restaurados exitosamente"
+# Verificar que se restauró correctamente
+if [ -d "$CHROMA_DIR" ]; then
+    echo "✅ Datos de ChromaDB restaurados exitosamente en $CHROMA_DIR"
+    echo "📊 Tamaño: $(du -sh "$CHROMA_DIR" | cut -f1)"
+else
+    echo "❌ Error: No se pudo restaurar el directorio"
+    exit 1
+fi
+
 echo ""
 echo "🚀 Ahora puedes iniciar los servicios con:"
 echo "   make prod"

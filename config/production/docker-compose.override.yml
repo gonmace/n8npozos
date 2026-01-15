@@ -1,7 +1,5 @@
 # Override para producción
-# Usar con: docker-compose -f deploy/docker-compose.yml -f config/production/docker-compose.override.yml
-
-version: '3.8'
+# Usar con: docker compose -f deploy/docker-compose.yml -f config/production/docker-compose.override.yml
 
 services:
   gradio:

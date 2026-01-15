@@ -29,8 +29,7 @@ Stack completo para automatización con n8n, base de datos vectorial ChromaDB y 
 │   ├── clean.sh          # Limpiar recursos
 │   └── backup.sh         # Backup de volúmenes
 ├── deploy/                # Archivos Docker Compose
-│   ├── docker-compose.yml        # Configuración principal
-│   └── docker-compose-pliego.yml # Configuración alternativa
+│   └── docker-compose.yml        # Configuración principal
 ├── requirements.txt       # Dependencias Python (producción)
 ├── requirements-dev.txt   # Dependencias Python (desarrollo)
 └── .env.example          # Plantilla de variables de entorno

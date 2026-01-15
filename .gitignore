@@ -58,4 +58,9 @@ Thumbs.db
 # Volumes de Docker (si están en el proyecto)
 volumes/
 
+# ChromaDB storage (bind mount) - ignorar contenido pero mantener directorio
+deploy/chroma_storage/*
+!deploy/chroma_storage/.gitkeep
+chroma-backup/
+
 
