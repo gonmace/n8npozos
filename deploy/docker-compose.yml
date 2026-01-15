@@ -55,6 +55,10 @@ services:
       N8N_PROTOCOL: https
       WEBHOOK_URL: https://${N8N_HOST}
 
+      # Configuración de proxy reverso (Nginx)
+      N8N_PROXY_HOPS: 1
+      N8N_TRUST_PROXY: "true"
+
       NODE_ENV: production
       TZ: America/La_Paz
 
