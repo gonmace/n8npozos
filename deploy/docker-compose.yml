@@ -30,7 +30,7 @@ services:
       retries: 10
 
   n8n:
-    image: n8nio/n8n:2.0.2
+    image: n8nio/n8n:2.7.4
     container_name: n8npozos-n8n
     hostname: n8n
     networks: ['pozos']
@@ -54,10 +54,6 @@ services:
       N8N_HOST: ${N8N_HOST}
       N8N_PROTOCOL: https
       WEBHOOK_URL: https://${N8N_HOST}
-
-      # Configuración de proxy reverso (Nginx)
-      N8N_PROXY_HOPS: 1
-      N8N_TRUST_PROXY: "true"
 
       NODE_ENV: production
       TZ: America/La_Paz

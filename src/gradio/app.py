@@ -4,6 +4,8 @@ import time
 import gradio as gr
 import chromadb
 from chromadb.utils import embedding_functions
+import requests
+import json
 
 # Configuración desde variables de entorno
 # En Docker, siempre usar el nombre del servicio y puerto interno
@@ -44,6 +46,24 @@ GRADIO_AUTH_PASSWORD = os.getenv("GRADIO_AUTH_PASSWORD", "admin123")
 GRADIO_SERVER_PORT = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
 ENV = os.getenv("ENV", "production")
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
+# Configuración de n8n
+N8N_HOST = os.getenv("N8N_HOST", "localhost")
+N8N_PORT = os.getenv("N8N_PORT", "5678")
+N8N_PROTOCOL = os.getenv("N8N_PROTOCOL", "http")
+N8N_WEBHOOK_PATH = os.getenv("N8N_WEBHOOK_PATH", "data_test")
+# Construir URL de n8n: en Docker usar el nombre del servicio, en local usar localhost
+try:
+    with open("/proc/1/cgroup", "r") as f:
+        if "docker" in f.read():
+            N8N_URL = f"http://n8n:5678/webhook/{N8N_WEBHOOK_PATH}"  # Puerto interno de Docker
+        else:
+            N8N_URL = f"{N8N_PROTOCOL}://{N8N_HOST}:{N8N_PORT}/webhook/{N8N_WEBHOOK_PATH}"
+except:
+    N8N_URL = f"{N8N_PROTOCOL}://{N8N_HOST}:{N8N_PORT}/webhook/{N8N_WEBHOOK_PATH}"
+
+print(f"🔧 Configuración n8n:")
+print(f"   N8N_URL: {N8N_URL}")
 
 # Configuración del modelo de embedding de OpenAI
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -404,6 +424,116 @@ def obtener_embedding(id_doc):
             error_msg += f"\n\n{traceback.format_exc()}"
         return "", "", "", error_msg
 
+def procesar_archivo_whatsapp(archivo, n8n_url):
+    """Procesar archivo txt o JSON de WhatsApp y enviarlo a n8n"""
+    try:
+        if archivo is None:
+            return "❌ Error: No se ha seleccionado ningún archivo"
+        
+        if not n8n_url or not n8n_url.strip():
+            return "❌ Error: Debes ingresar la URL de n8n"
+        
+        # Validar que la URL sea válida
+        url_limpia = n8n_url.strip()
+        if not url_limpia.startswith(('http://', 'https://')):
+            return "❌ Error: La URL debe comenzar con http:// o https://"
+        
+        # Obtener la ruta del archivo (Gradio con type="filepath" devuelve una cadena)
+        file_path = archivo if isinstance(archivo, str) else (archivo.name if hasattr(archivo, 'name') else str(archivo))
+        
+        if not file_path or not os.path.exists(file_path):
+            return "❌ Error: El archivo no existe o no se pudo acceder"
+        
+        # Detectar tipo de archivo
+        filename = os.path.basename(file_path)
+        es_json = filename.lower().endswith('.json')
+        
+        # Leer el contenido del archivo
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                contenido = f.read()
+        except UnicodeDecodeError:
+            # Intentar con diferentes codificaciones
+            try:
+                with open(file_path, 'r', encoding='latin-1') as f:
+                    contenido = f.read()
+            except Exception as e:
+                return f"❌ Error al leer el archivo: {str(e)}"
+        except Exception as e:
+            return f"❌ Error al leer el archivo: {str(e)}"
+        
+        if not contenido or not contenido.strip():
+            return "❌ Error: El archivo está vacío"
+        
+        # Si es JSON, validar y procesar
+        if es_json:
+            try:
+                datos_json = json.loads(contenido)
+                # Validar estructura básica
+                if not isinstance(datos_json, list):
+                    return "❌ Error: El JSON debe ser un array de objetos"
+                
+                # Preparar el payload para n8n con datos JSON
+                payload = {
+                    "file_content": contenido,
+                    "filename": filename,
+                    "file_type": "json",
+                    "data": datos_json  # Incluir los datos parseados también
+                }
+            except json.JSONDecodeError as e:
+                return f"❌ Error: El archivo JSON no es válido: {str(e)}"
+        else:
+            # Preparar el payload para n8n con archivo de texto
+            payload = {
+                "file_content": contenido,
+                "filename": filename,
+                "file_type": "txt"
+            }
+        
+        # Hacer POST a n8n
+        try:
+            response = requests.post(
+                url_limpia,
+                json=payload,
+                timeout=30,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            # Verificar respuesta
+            if response.status_code == 200:
+                try:
+                    result = response.json()
+                    tipo_archivo = "JSON" if es_json else "TXT"
+                    return f"✅ Archivo {tipo_archivo} procesado exitosamente\n\nURL: {url_limpia}\nArchivo: {filename}\n\nRespuesta de n8n:\n{json.dumps(result, indent=2, ensure_ascii=False)}"
+                except:
+                    return f"✅ Archivo procesado exitosamente\n\nURL: {url_limpia}\nArchivo: {filename}\n\nRespuesta de n8n:\n{response.text}"
+            else:
+                error_msg = f"❌ Error al enviar a n8n (código {response.status_code})\n\nURL: {url_limpia}\nArchivo: {filename}"
+                try:
+                    error_detail = response.json()
+                    error_msg += f"\n\nDetalle: {error_detail}"
+                except:
+                    error_msg += f"\n\nRespuesta: {response.text}"
+                return error_msg
+                
+        except requests.exceptions.Timeout:
+            return f"❌ Error: Timeout al conectar con n8n en {url_limpia}"
+        except requests.exceptions.ConnectionError:
+            return f"❌ Error: No se pudo conectar con n8n en {url_limpia}\n\nVerifica que n8n esté corriendo y que la URL sea correcta."
+        except Exception as e:
+            error_msg = f"❌ Error al enviar a n8n: {str(e)}\n\nURL: {url_limpia}"
+            if DEBUG:
+                import traceback
+                error_msg += f"\n\n{traceback.format_exc()}"
+            return error_msg
+            
+    except Exception as e:
+        error_msg = f"❌ Error al procesar archivo: {str(e)}"
+        if DEBUG:
+            import traceback
+            error_msg += f"\n\n{traceback.format_exc()}"
+        return error_msg
+
 with gr.Blocks(title="Panel Admin - ChromaDB") as demo:
     gr.Markdown("# 🗄️ Panel Admin – ChromaDB")
     gr.Markdown("Gestiona embeddings y documentos en ChromaDB")
@@ -557,6 +687,140 @@ with gr.Blocks(title="Panel Admin - ChromaDB") as demo:
             ).then(
                 fn=listar,
                 outputs=[tabla]
+            )
+        
+        # Pestaña 3: Subir archivo WhatsApp
+        with gr.Tab("📱 Subir WhatsApp"):
+            gr.Markdown("### Subir archivo de WhatsApp")
+            gr.Markdown("Sube un archivo de texto (.txt) o JSON (.json) exportado de WhatsApp para procesarlo con n8n")
+            
+            # JavaScript para manejar localStorage - se ejecuta después de que se renderice el componente
+            gr.HTML("""
+            <script>
+            (function() {
+                const STORAGE_KEY = 'n8n_webhook_url';
+                let urlInputFound = false;
+                
+                function setupUrlStorage() {
+                    if (urlInputFound) return;
+                    
+                    // Buscar el input de URL usando el placeholder o label
+                    const allInputs = document.querySelectorAll('input[type="text"], textarea');
+                    
+                    for (let input of allInputs) {
+                        // Buscar el contenedor padre que tiene el label
+                        let container = input.closest('.form, .form-group, .block, [class*="form"]');
+                        if (!container) container = input.parentElement;
+                        
+                        // Buscar el label en el contenedor o cerca
+                        let label = container.querySelector('label');
+                        if (!label) {
+                            // Buscar en elementos hermanos
+                            let sibling = input.previousElementSibling;
+                            while (sibling && !label) {
+                                if (sibling.tagName === 'LABEL' || sibling.querySelector('label')) {
+                                    label = sibling.tagName === 'LABEL' ? sibling : sibling.querySelector('label');
+                                }
+                                sibling = sibling.previousElementSibling;
+                            }
+                        }
+                        
+                        if (label) {
+                            const labelText = label.textContent || label.innerText || '';
+                            if (labelText.includes('URL de n8n') || labelText.includes('webhook') || 
+                                input.placeholder.includes('webhook') || input.placeholder.includes('n8n')) {
+                                
+                                urlInputFound = true;
+                                
+                                // Cargar URL guardada al inicio
+                                const savedUrl = localStorage.getItem(STORAGE_KEY);
+                                if (savedUrl) {
+                                    input.value = savedUrl;
+                                    // Disparar eventos para que Gradio detecte el cambio
+                                    const events = ['input', 'change', 'blur'];
+                                    events.forEach(eventType => {
+                                        input.dispatchEvent(new Event(eventType, { bubbles: true, cancelable: true }));
+                                    });
+                                }
+                                
+                                // Guardar cuando cambia el valor
+                                const saveUrl = function() {
+                                    const value = this.value ? this.value.trim() : '';
+                                    if (value) {
+                                        localStorage.setItem(STORAGE_KEY, value);
+                                    }
+                                };
+                                
+                                input.addEventListener('input', saveUrl);
+                                input.addEventListener('blur', saveUrl);
+                                input.addEventListener('change', saveUrl);
+                                
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Intentar configurar inmediatamente
+                setupUrlStorage();
+                
+                // También intentar después de un delay para cuando Gradio renderice
+                setTimeout(setupUrlStorage, 500);
+                setTimeout(setupUrlStorage, 1500);
+                
+                // Observar cambios en el DOM
+                const observer = new MutationObserver(function() {
+                    if (!urlInputFound) {
+                        setupUrlStorage();
+                    }
+                });
+                
+                if (document.body) {
+                    observer.observe(document.body, { 
+                        childList: true, 
+                        subtree: true,
+                        attributes: false
+                    });
+                } else {
+                    document.addEventListener('DOMContentLoaded', function() {
+                        observer.observe(document.body, { 
+                            childList: true, 
+                            subtree: true,
+                            attributes: false
+                        });
+                    });
+                }
+            })();
+            </script>
+            """)
+            
+            with gr.Row():
+                with gr.Column():
+                    n8n_url_input = gr.Textbox(
+                        label="URL de n8n Webhook",
+                        placeholder="Ej: http://localhost:5678/webhook/data_test o https://n8npozos.magoreal.com/webhook/data_test",
+                        lines=1,
+                        value=N8N_URL  # Valor por defecto desde configuración
+                    )
+                    gr.Markdown("💾 La URL se guarda automáticamente en tu navegador (localStorage)")
+            
+            archivo_input = gr.File(
+                label="Archivo de WhatsApp (TXT o JSON)",
+                file_types=[".txt", ".json"],
+                type="filepath"
+            )
+            
+            procesar_btn = gr.Button("🚀 Procesar y Enviar a n8n", variant="primary")
+            resultado_whatsapp = gr.Textbox(
+                label="Resultado",
+                interactive=False,
+                lines=10
+            )
+            
+            procesar_btn.click(
+                fn=procesar_archivo_whatsapp,
+                inputs=[archivo_input, n8n_url_input],
+                outputs=[resultado_whatsapp]
             )
 
 if __name__ == "__main__":
