@@ -30,7 +30,7 @@ services:
       retries: 10
 
   n8n:
-    image: n8nio/n8n:2.7.4
+    image: n8nio/n8n:2.9.0
     container_name: n8npozos-n8n
     hostname: n8n
     networks: ['pozos']
