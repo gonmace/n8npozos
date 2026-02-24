@@ -155,8 +155,10 @@ services:
     networks: ['pozos']
     restart: unless-stopped
     environment:
-      - N8N_BASE_URL=http://n8n:5678
+      - N8N_API_URL=http://n8n:5678
       - N8N_API_KEY=${N8N_API_KEY}
+      - N8N_MODE=true
+      - MCP_MODE=http
     ports:
       - "3001:3000"
     depends_on:
