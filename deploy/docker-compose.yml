@@ -150,7 +150,7 @@ services:
 
   n8n-mcp:
     image: ghcr.io/czlonkowski/n8n-mcp:latest
-    container_name: n8n-mcp
+    container_name: n8npozos-n8n-mcp
     hostname: n8n-mcp
     networks: ['pozos']
     restart: unless-stopped
