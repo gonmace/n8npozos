@@ -150,13 +150,13 @@ services:
 
   n8n-mcp:
     image: ghcr.io/czlonkowski/n8n-mcp:latest
-    container_name: n8npozos-n8n-mcp
+    container_name: n8n-mcp
     hostname: n8n-mcp
     networks: ['pozos']
     restart: unless-stopped
     environment:
-      N8N_BASE_URL: ${N8N_BASE_URL}
-      N8N_API_KEY: ${N8N_API_KEY}
+      - N8N_BASE_URL: http://n8n:5678
+      - N8N_API_KEY: ${N8N_API_KEY}
     ports:
       - "3001:3000"
     depends_on:
