@@ -157,8 +157,6 @@ services:
     environment:
       - N8N_API_URL=http://n8n:5678
       - N8N_API_KEY=${N8N_API_KEY}
-      - N8N_MODE=true
-      - MCP_MODE=http
       - AUTH_TOKEN=${MCP_AUTH_TOKEN}
     ports:
       - "3001:3000"
