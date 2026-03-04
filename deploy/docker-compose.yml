@@ -78,8 +78,6 @@ services:
     hostname: chroma
     networks: ['pozos']
     restart: unless-stopped
-    ports:
-      - "8008:8000"   # puedes quitar esto si no necesitas acceso externo
     environment:
       IS_PERSISTENT: "TRUE"
       PERSIST_DIRECTORY: /data
