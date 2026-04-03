@@ -12,6 +12,7 @@ services:
       - "127.0.0.1:8008:8000"  # Acceso directo para desarrollo local fuera de Docker
 
 
+
   gradio:
     build:
       context: ../..

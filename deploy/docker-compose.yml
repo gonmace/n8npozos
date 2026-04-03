@@ -15,11 +15,12 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-magoreal}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      POSTGRES_DB: ${POSTGRES_DB:-pozos}
+      POSTGRES_DB: ${POSTGRES_USER:-magoreal}
     volumes:
       - ../postgres_storage:/var/lib/postgresql/data
+      - ../scripts/postgres-initdb.sh:/docker-entrypoint-initdb.d/init.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -37,7 +38,7 @@ services:
       DB_POSTGRESDB_HOST: postgres
       DB_POSTGRESDB_USER: ${POSTGRES_USER}
       DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_DATABASE: n8n
 
       N8N_DIAGNOSTICS_ENABLED: "false"
       N8N_PERSONALIZATION_ENABLED: "false"
@@ -104,8 +105,7 @@ services:
       ENV: ${ENV:-production}
       DEBUG: ${DEBUG:-false}
     depends_on:
-      chroma:
-        condition: service_started
+      - chroma
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:7860')"]
       interval: 30s
