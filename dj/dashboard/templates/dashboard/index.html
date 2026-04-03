@@ -56,9 +56,6 @@
                 </div>
                 <button id="mcp-toggle-btn"
                     class="btn btn-sm {% if mcp_status == 'running' %}btn-error{% else %}btn-success{% endif %}"
-                    hx-post="{% url 'mcp_toggle' %}"
-                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                    hx-swap="none"
                     onclick="mcpToggle(this)">
                     {% if mcp_status == 'running' %}Detener{% else %}Iniciar{% endif %}
                 </button>
