@@ -193,7 +193,7 @@ services:
       TZ: America/La_Paz
     volumes:
       - ../chats:/app/chats
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
