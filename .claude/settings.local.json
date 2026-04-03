@@ -52,7 +52,8 @@
       "Bash(ls /home/gonzalo/n8npozos/*.conf)",
       "Bash(ssh:*)",
       "Bash(sudo chown:*)",
-      "Bash(docker events:*)"
+      "Bash(docker events:*)",
+      "Bash(docker top:*)"
     ]
   }
 }
