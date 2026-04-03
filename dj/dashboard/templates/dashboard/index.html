@@ -63,14 +63,29 @@
 
             <script>
             function mcpToggle(btn) {
+                const originalText = btn.textContent;
                 btn.disabled = true;
                 btn.textContent = 'Espera…';
                 fetch("{% url 'mcp_toggle' %}", {
                     method: 'POST',
-                    headers: {'X-CSRFToken': '{{ csrf_token }}'},
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Accept': 'application/json',
+                    },
                 })
-                .then(r => r.json())
+                .then(r => {
+                    if (!r.ok && r.status !== 404 && r.status !== 500) {
+                        throw new Error('HTTP ' + r.status);
+                    }
+                    return r.json();
+                })
                 .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                        return;
+                    }
                     const running = data.status === 'running';
                     btn.textContent = running ? 'Detener' : 'Iniciar';
                     btn.className = 'btn btn-sm ' + (running ? 'btn-error' : 'btn-success');
@@ -79,7 +94,11 @@
                     txt.className = 'text-sm mt-1 ' + (running ? 'text-success' : 'text-base-content opacity-50');
                     btn.disabled = false;
                 })
-                .catch(() => { btn.textContent = 'Error'; btn.disabled = false; });
+                .catch(err => {
+                    alert('Error de conexión: ' + err.message);
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                });
                 return false;
             }
             </script>

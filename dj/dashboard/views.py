@@ -26,14 +26,13 @@ def mcp_toggle(request):
         client = docker_sdk.from_env()
         container = client.containers.get(MCP_CONTAINER)
         if container.status == "running":
-            container.stop()
-            new_status = "exited"
+            container.stop(timeout=5)
         else:
             container.start()
-            new_status = "running"
-        return JsonResponse({"status": new_status})
+        container.reload()
+        return JsonResponse({"status": container.status})
     except docker_sdk.errors.NotFound:
-        return JsonResponse({"error": "Contenedor no encontrado"}, status=404)
+        return JsonResponse({"error": f"Contenedor '{MCP_CONTAINER}' no encontrado"}, status=404)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
