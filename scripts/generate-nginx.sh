@@ -24,15 +24,15 @@ set +a
 
 OUTPUT_FILE="${DOMAIN}.conf"
 
+# Usar template sin SSL si los certificados aún no existen
+if [ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
+    TEMPLATE_USED="$TEMPLATE"
+else
+    TEMPLATE_USED="deploy/nginx.conf.nossl.template"
+    echo "ℹ️  Certificados SSL no encontrados — usando configuración HTTP (solo puerto 80)"
+fi
+
 envsubst '${DOMAIN} ${N8N_PORT} ${GRADIO_PORT} ${API_PORT} ${DJANGO_PORT} ${MCP_PORT}' \
-    < "$TEMPLATE" > "$OUTPUT_FILE"
+    < "$TEMPLATE_USED" > "$OUTPUT_FILE"
 
 echo "✅ Configuración de nginx generada: $OUTPUT_FILE"
-echo ""
-echo "Para instalarla en el servidor:"
-echo "  sudo cp $OUTPUT_FILE /etc/nginx/sites-available/$OUTPUT_FILE"
-echo "  sudo ln -sf /etc/nginx/sites-available/$OUTPUT_FILE /etc/nginx/sites-enabled/$OUTPUT_FILE"
-echo "  sudo nginx -t && sudo systemctl reload nginx"
-echo ""
-echo "Para HTTPS con certbot (después de instalar nginx):"
-echo "  sudo certbot --nginx -d ${DOMAIN}"
