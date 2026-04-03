@@ -49,6 +49,16 @@ server {
         proxy_send_timeout 120;
     }
 
+    # Django static files — /static/
+    location /static/ {
+        proxy_pass http://127.0.0.1:${DJANGO_PORT}/static/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        expires 30d;
+        add_header Cache-Control "public";
+    }
+
     # Django Dashboard — /dashboard/
     location /dashboard/ {
         proxy_pass http://127.0.0.1:${DJANGO_PORT}/;
