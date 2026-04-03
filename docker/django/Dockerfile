@@ -16,6 +16,7 @@ COPY dj/core /app/core
 COPY dj/dashboard /app/dashboard
 COPY dj/audit /app/audit
 COPY dj/theme /app/theme
+COPY dj/static /app/static
 COPY dj/manage.py /app/
 # Scripts Python que usa el módulo audit para procesar chats
 COPY scripts/parse_whatsapp_chats.py /app/scripts/
