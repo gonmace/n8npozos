@@ -1,75 +1,86 @@
-.PHONY: help dev prod stop clean backup restore nginx-config logs shell-gradio shell-postgres shell-n8n tailwind-build tailwind-dev
+.PHONY: help dev prod stop clean build rebuild check-ports logs shell django tailwind backup restore nginx-config
 
-help: ## Mostrar esta ayuda
-	@echo "Comandos disponibles:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+COMPOSE     = docker compose --env-file .env -f deploy/docker-compose.yml
+COMPOSE_DEV = $(COMPOSE) -f config/development/docker-compose.override.yml
 
-dev: ## Iniciar servicios de desarrollo con override (puertos locales, bind mounts de código)
-	docker compose --env-file .env -f deploy/docker-compose.yml -f config/development/docker-compose.override.yml up -d
+help:
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-prod: ## Iniciar entorno de producción
+# ── Entornos ──────────────────────────────────────────────────────────────────
+
+dev: check-ports ## Levantar dev  (bind mounts + puertos locales)
+	$(COMPOSE_DEV) up -d
+
+prod: ## Levantar producción
 	@./scripts/prod.sh
 
-stop: ## Detener servicios (usa: make stop ENV=production para producción)
+stop: ## Detener  [ENV=production]
 	@./scripts/stop.sh $(ENV)
+
+# ── Debug ─────────────────────────────────────────────────────────────────────
+
+logs: ## Logs  [SVC=n8n|django|api|gradio]
+	$(COMPOSE) logs -f $(SVC)
+
+shell: ## Shell en contenedor  SVC=django|api|gradio|n8n|postgres
+	@case "$(SVC)" in \
+		postgres) $(COMPOSE) exec postgres psql \
+			-U $$(grep POSTGRES_USER .env | cut -d= -f2) \
+			-d $$(grep POSTGRES_DB   .env | cut -d= -f2) ;; \
+		n8n)      $(COMPOSE) exec n8n /bin/sh ;; \
+		*)        $(COMPOSE) exec $(SVC) /bin/bash ;; \
+	esac
+
+django: ## Comando Django  CMD=migrate|createsuperuser|…
+	$(COMPOSE) exec django python manage.py $(CMD)
+
+# ── Imágenes ──────────────────────────────────────────────────────────────────
+
+build: ## Construir imágenes  [--no-cache con rebuild]
+	$(COMPOSE) build --progress=plain
+
+rebuild: ## Reconstruir sin cache
+	$(COMPOSE) build --no-cache --progress=plain
+
+# ── Tailwind ──────────────────────────────────────────────────────────────────
+
+tailwind: ## CSS Tailwind  [WATCH=1 para modo dev]
+	@if [ "$(WATCH)" = "1" ]; then \
+		cd dj/theme/static_src && npm run dev; \
+	else \
+		cd dj/theme/static_src && npm install && npm run build; \
+	fi
+
+# ── Datos ─────────────────────────────────────────────────────────────────────
+
+backup: ## Backup de volúmenes
+	@./scripts/backup.sh
+
+restore: ## Restaurar desde backups/
+	@./scripts/restore.sh
 
 clean: ## Limpiar contenedores, imágenes y volúmenes
 	@./scripts/clean.sh
 
-backup: ## Crear backup de volúmenes
-	@./scripts/backup.sh
-
-restore: ## Restaurar volúmenes desde backups/
-	@./scripts/restore.sh
-
-nginx-config: ## Generar configuración de nginx desde .env
+nginx-config: ## Generar configuración nginx desde .env
 	@./scripts/generate-nginx.sh
 
-logs: ## Ver logs de todos los servicios
-	docker compose --env-file .env -f deploy/docker-compose.yml logs -f
+# ── Interno ───────────────────────────────────────────────────────────────────
 
-logs-gradio: ## Ver logs de Gradio
-	docker compose --env-file .env -f deploy/docker-compose.yml logs -f gradio
-
-logs-n8n: ## Ver logs de n8n
-	docker compose --env-file .env -f deploy/docker-compose.yml logs -f n8n
-
-logs-api: ## Ver logs del microservicio API
-	docker compose --env-file .env -f deploy/docker-compose.yml logs -f api
-
-shell-gradio: ## Abrir shell en contenedor de Gradio
-	docker compose --env-file .env -f deploy/docker-compose.yml exec gradio /bin/bash
-
-shell-api: ## Abrir shell en contenedor del microservicio API
-	docker compose --env-file .env -f deploy/docker-compose.yml exec api /bin/bash
-
-shell-postgres: ## Abrir shell en contenedor de PostgreSQL
-	docker compose --env-file .env -f deploy/docker-compose.yml exec postgres psql -U $$(grep POSTGRES_USER .env | cut -d '=' -f2) -d $$(grep POSTGRES_DB .env | cut -d '=' -f2)
-
-shell-n8n: ## Abrir shell en contenedor de n8n
-	docker compose --env-file .env -f deploy/docker-compose.yml exec n8n /bin/sh
-
-logs-django: ## Ver logs del servicio Django
-	docker compose --env-file .env -f deploy/docker-compose.yml logs -f django
-
-shell-django: ## Abrir shell en contenedor de Django
-	docker compose --env-file .env -f deploy/docker-compose.yml exec django /bin/bash
-
-migrate-django: ## Ejecutar migraciones de Django
-	docker compose --env-file .env -f deploy/docker-compose.yml exec django python manage.py migrate
-
-createsuperuser-django: ## Crear superusuario Django
-	docker compose --env-file .env -f deploy/docker-compose.yml exec django python manage.py createsuperuser
-
-tailwind-build: ## Compilar CSS de Tailwind una vez (requerido antes de correr Django local)
-	cd dj/theme/static_src && npm install && npm run build
-
-tailwind-dev: ## Vigilar y recompilar CSS de Tailwind automáticamente (para dev local)
-	cd dj/theme/static_src && npm run dev
-
-build: ## Construir imágenes Docker
-	docker compose --env-file .env -f deploy/docker-compose.yml build --progress=plain
-
-rebuild: ## Reconstruir imágenes sin cache
-	docker compose --env-file .env -f deploy/docker-compose.yml build --no-cache --progress=plain
-
+check-ports:
+	@set -a; . ./.env; set +a; \
+	PORTS="$${N8N_PORT:-6001}:n8n $${GRADIO_PORT:-6002}:gradio $${API_PORT:-6003}:api $${DJANGO_PORT:-6004}:django $${MCP_PORT:-6005}:mcp"; \
+	BLOCKED=""; \
+	for entry in $$PORTS; do \
+		port=$${entry%%:*}; svc=$${entry##*:}; \
+		if ss -tlnp 2>/dev/null | grep -q ":$$port "; then \
+			BLOCKED="$$BLOCKED\n  \033[31m✗\033[0m $$port ($$svc) — ocupado"; \
+		else \
+			printf "  \033[32m✓\033[0m $$port ($$svc) — libre\n"; \
+		fi; \
+	done; \
+	if [ -n "$$BLOCKED" ]; then \
+		printf "$$BLOCKED\n\n\033[33mSugerencia:\033[0m ajusta los puertos en .env\n"; \
+		exit 1; \
+	fi

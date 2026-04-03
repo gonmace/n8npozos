@@ -9,16 +9,16 @@ services:
 
   chroma:
     ports:
-      - "127.0.0.1:8008:8000"  # Acceso directo para desarrollo local fuera de Docker
+      - "127.0.0.1:8200:8000"  # Acceso directo para desarrollo local fuera de Docker
 
 
 
   gradio:
     build:
-      context: ../..
+      context: ..
       dockerfile: docker/gradio/Dockerfile.dev
     volumes:
-      - ../../src/gradio:/app
+      - ../src/gradio:/app
     environment:
       ENV: development
       DEBUG: "true"
@@ -32,10 +32,10 @@ services:
 
   api:
     build:
-      context: ../..
+      context: ..
       dockerfile: docker/api/Dockerfile.dev
     volumes:
-      - ../../src/api:/app
+      - ../src/api:/app
     environment:
       ENV: development
       DEBUG: "true"
