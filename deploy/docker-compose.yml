@@ -156,7 +156,6 @@ services:
       N8N_API_URL: http://n8n:5678
       N8N_API_KEY: ${N8N_API_KEY}
       MCP_MODE: http
-      USE_FIXED_HTTP: "true"
       AUTH_TOKEN: ${MCP_AUTH_TOKEN}
       N8N_MCP_TELEMETRY_DISABLED: "true"
     ports:
