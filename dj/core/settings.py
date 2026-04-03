@@ -114,7 +114,7 @@ USE_TZ = True
 
 # Static files
 
-STATIC_URL = '/static/'
+STATIC_URL = '/dashboard/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 STATICFILES_DIRS = [
