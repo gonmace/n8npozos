@@ -100,25 +100,18 @@ Variables mínimas a cambiar en `.env`:
 
 ### 2. Restaurar datos (si migrás desde otro servidor)
 
-Los datos viven en bind mounts dentro del proyecto. Hay dos opciones:
-
-**Opción A — Copiar directorios directamente (recomendado):**
+**Desde la máquina origen**, empaquetar y pushear al repo:
 ```bash
-scp -r usuario@origen:~/n8npozos/n8n_storage/ ./
-scp -r usuario@origen:~/n8npozos/postgres_storage/ ./
-scp -r usuario@origen:~/n8npozos/chroma_storage/ ./
+make push-data
+# Empaqueta n8n_storage/ y chroma_storage/, los commitea y pushea
 ```
 
-**Opción B — Desde backups comprimidos:**
+`make prod` en el servidor ya hace `git pull`, así que los backups llegarán solos. Luego en el servidor:
 ```bash
-scp usuario@origen:~/n8npozos/backups/n8n_TIMESTAMP.tar.gz     ./backups/n8n_storage.tar.gz
-scp usuario@origen:~/n8npozos/backups/postgres_TIMESTAMP.tar.gz ./backups/postgres_storage.tar.gz
-scp usuario@origen:~/n8npozos/backups/chroma_TIMESTAMP.tar.gz   ./backups/chroma_storage.tar.gz
-
 make restore
 ```
 
-> **Importante:** La `N8N_ENCRYPTION_KEY` debe ser **exactamente igual** que en el servidor origen. Si cambia, todas las credenciales guardadas en n8n quedan ilegibles.
+> **Importante:** La `N8N_ENCRYPTION_KEY` en `.env` debe ser **exactamente igual** que en el servidor origen. Si cambia, todas las credenciales guardadas en n8n quedan ilegibles.
 
 > **Nota:** Si `postgres_storage/` tiene un archivo `.gitkeep` (instalación nueva), eliminarlo antes de levantar: `sudo rm postgres_storage/.gitkeep`
 
@@ -454,6 +447,7 @@ make tailwind                # Compilar una vez (antes de make build)
 
 # Datos
 make backup                  # Backup de datos → backups/
+make push-data               # Empaquetar n8n+chroma, commitear y pushear al repo
 make restore                 # Restaurar desde backups/
 make clean                   # Eliminar contenedores, imágenes y volúmenes
 ```
