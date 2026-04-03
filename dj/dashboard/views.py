@@ -1,5 +1,4 @@
 import docker as docker_sdk
-from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_POST
@@ -19,7 +18,6 @@ def _mcp_status():
         return "error"
 
 
-@login_required
 @require_POST
 def mcp_toggle(request):
     try:
