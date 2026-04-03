@@ -6,13 +6,13 @@ Stack completo para automatización con n8n, base de datos vectorial ChromaDB, p
 
 | Servicio | Descripción | Producción | Desarrollo local |
 |---|---|---|---|
-| **n8n** | Motor de automatización de workflows | `https://dominio.com/` | http://localhost:5679 |
-| **Django Dashboard** | Monitoreo y auditoría de conversaciones | `https://dominio.com/dashboard/` | http://localhost:8010 |
-| **Gradio** | Panel admin de ChromaDB (embeddings) | `https://dominio.com/gradio/` | http://localhost:7860 |
-| **API** | Búsqueda MMR sobre ChromaDB (FastAPI) | `https://dominio.com/api/` | http://localhost:8009 |
-| **n8n-MCP** | Servidor MCP para AI IDEs | `https://dominio.com/mcp` | http://localhost:3001/mcp |
+| **n8n** | Motor de automatización de workflows | `https://dominio.com/` | http://localhost:6001 |
+| **Django Dashboard** | Monitoreo y auditoría de conversaciones | `https://dominio.com/dashboard/` | http://localhost:6004 |
+| **Gradio** | Panel admin de ChromaDB (embeddings) | `https://dominio.com/gradio/` | http://localhost:6002 |
+| **API** | Búsqueda MMR sobre ChromaDB (FastAPI) | `https://dominio.com/api/` | http://localhost:6003 |
+| **n8n-MCP** | Servidor MCP para AI IDEs | `https://dominio.com/mcp` | http://localhost:6005/mcp |
 | **PostgreSQL** | Base de datos de n8n y Django | interno | localhost:5433 |
-| **ChromaDB** | Base de datos vectorial | interno | localhost:8008 |
+| **ChromaDB** | Base de datos vectorial | interno | localhost:8200 |
 
 Nginx corre en el host y enruta el tráfico a los contenedores Docker.
 
@@ -41,7 +41,7 @@ Nginx corre en el host y enruta el tráfico a los contenedores Docker.
 │   ├── production/            # Override docker-compose para producción
 │   └── development/           # Override docker-compose para desarrollo local
 ├── scripts/
-│   ├── prod.sh                # Levantar producción
+│   ├── prod.sh                # Levantar producción (git pull + build + up)
 │   ├── backup.sh              # Backup de datos → backups/
 │   ├── restore.sh             # Restaurar desde backups/
 │   ├── generate-nginx.sh      # Generar config de nginx desde .env
@@ -120,11 +120,12 @@ make restore
 
 > **Importante:** La `N8N_ENCRYPTION_KEY` debe ser **exactamente igual** que en el servidor origen. Si cambia, todas las credenciales guardadas en n8n quedan ilegibles.
 
-### 3. Construir imágenes y levantar
+> **Nota:** Si `postgres_storage/` tiene un archivo `.gitkeep` (instalación nueva), eliminarlo antes de levantar: `sudo rm postgres_storage/.gitkeep`
+
+### 3. Construir e iniciar
 
 ```bash
-make build   # construir imágenes Docker (Django, Gradio, API)
-make prod    # levantar todos los servicios
+make prod    # git pull + construir imágenes + levantar servicios
 docker ps    # verificar que todos estén healthy
 ```
 
@@ -134,19 +135,14 @@ En una instalación nueva (sin datos restaurados), crear la base de datos de Dja
 
 ```bash
 ./scripts/init-database.sh
+make django CMD=migrate
 ```
-
-Esto crea la DB `n8n_django` en PostgreSQL. Las tablas se crean automáticamente cuando Django arranca.
 
 ### 5. Configurar nginx
 
 ```bash
 make nginx-config
-# Genera: <DOMAIN>.conf usando las variables del .env
-
-sudo cp *.conf /etc/nginx/sites-available/
-sudo ln -sf /etc/nginx/sites-available/<DOMAIN>.conf /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
+# Genera el .conf, lo copia a sites-available, crea el symlink y recarga nginx
 ```
 
 ### 6. HTTPS con certbot
@@ -173,7 +169,7 @@ Una vez que n8n esté corriendo y hayas creado tu cuenta:
 ### 8. Crear superusuario Django
 
 ```bash
-make createsuperuser-django
+make django CMD=createsuperuser
 # Accedé a: https://tu-dominio.com/dashboard/admin/
 ```
 
@@ -191,16 +187,16 @@ pip install -r requirements.txt        # Gradio + ChromaDB
 pip install -r requirements-dev.txt    # dependencias adicionales
 ```
 
-> Si no usás virtualenv: `pip install -r requirements.txt` directamente.
-
 ### Levantar todos los servicios en modo desarrollo
 
 ```bash
 make dev
 ```
 
+`make dev` verifica primero que los puertos estén libres antes de levantar. Si algún puerto está bloqueado (común en WSL2 por reservas de Hyper-V), muestra cuáles cambiar en `.env`.
+
 El override de desarrollo (`config/development/docker-compose.override.yml`) activa:
-- Puertos locales para acceder a PostgreSQL (5433) y ChromaDB (8008) desde el host
+- Puertos locales para acceder a PostgreSQL (5433) y ChromaDB (8200) desde el host
 - Bind mounts de `dj/core/`, `dj/dashboard/`, `dj/audit/` y `dj/static/` en el contenedor Django
 - `N8N_URL=http://n8n:5678` — Django consulta el n8n local, no producción
 - `DEBUG=True` en Django y gunicorn con `--reload`
@@ -209,11 +205,13 @@ Servicios disponibles:
 
 | Servicio | URL | Credenciales |
 |---|---|---|
-| n8n | http://localhost:5679 | cuenta propia |
-| Django Dashboard | http://localhost:8010 | superusuario Django |
-| Gradio (Docker) | http://localhost:7860 | `GRADIO_AUTH_USERNAME` / `GRADIO_AUTH_PASSWORD` del `.env` |
-| API (docs) | http://localhost:8009/api/docs | — |
-| n8n-MCP | http://localhost:3001/mcp | Bearer `MCP_AUTH_TOKEN` del `.env` |
+| n8n | http://localhost:6001 | cuenta propia |
+| Django Dashboard | http://localhost:6004 | superusuario Django |
+| Gradio (Docker) | http://localhost:6002 | `GRADIO_AUTH_USERNAME` / `GRADIO_AUTH_PASSWORD` del `.env` |
+| API (docs) | http://localhost:6003/api/docs | — |
+| n8n-MCP | http://localhost:6005/mcp | Bearer `MCP_AUTH_TOKEN` del `.env` |
+
+> Los puertos por defecto son 6001–6005. Pueden cambiarse en `.env` si hay conflictos.
 
 ### CSS — Tailwind + daisyUI
 
@@ -221,11 +219,11 @@ El CSS se compila desde `dj/theme/static_src/src/styles.css` → `dj/static/css/
 El contenedor Django tiene bind mount de `dj/static/` — el CSS compilado llega automáticamente sin reiniciar.
 
 ```bash
-make tailwind-dev    # watcher: recompila automáticamente al guardar (para desarrollo)
-make tailwind-build  # compilar una vez (requerido antes de make build)
+make tailwind WATCH=1   # watcher: recompila automáticamente al guardar (para desarrollo)
+make tailwind           # compilar una vez (requerido antes de make build)
 ```
 
-> Correr `make tailwind-dev` en una terminal separada mientras desarrollás templates o estilos.
+> Correr `make tailwind WATCH=1` en una terminal separada mientras desarrollás templates o estilos.
 
 ### Código fuente Django con hot-reload
 
@@ -233,9 +231,9 @@ Los bind mounts del override sincronizan el código fuente directamente al conte
 
 ### N8N_API_KEY en desarrollo
 
-El `N8N_API_KEY` del `.env` lo usa Django para consultar la API de n8n. En desarrollo apunta al n8n local (`http://localhost:5679`). Para generarlo:
+El `N8N_API_KEY` del `.env` lo usa Django para consultar la API de n8n. En desarrollo apunta al n8n local. Para generarlo:
 
-1. Accedé a http://localhost:5679 → **Settings → API → Create API Key**
+1. Accedé a http://localhost:6001 → **Settings → API → Create API Key**
 2. Actualizá `N8N_API_KEY` en `.env`
 3. Recreá el contenedor Django:
    ```bash
@@ -248,11 +246,6 @@ El `N8N_API_KEY` del `.env` lo usa Django para consultar la API de n8n. En desar
 source .venv/bin/activate
 python src/gradio/app.py
 ```
-
-> Si el contenedor Docker de Gradio ya ocupa el 7860:
-> ```bash
-> GRADIO_SERVER_PORT=7861 python src/gradio/app.py
-> ```
 
 ### Correr la API fuera de Docker
 
@@ -269,7 +262,8 @@ Permite monitorear y auditar las conversaciones del chatbot WhatsApp integrado c
 
 ### Funcionalidades
 
-- **Panel principal** — estadísticas de workflows y conversaciones activas
+- **Panel principal** — estadísticas de workflows, conversaciones y control del servidor MCP
+- **Control MCP** — botón para iniciar/detener el contenedor `n8n-mcp` desde el dashboard (ahorra recursos cuando no se usa)
 - **Historial de chats** — conversaciones con metadatos (teléfono, cotización, ubicación)
 - **Auditoría** — revisar y ajustar prompts del sistema, puntuar respuestas del bot
 
@@ -286,13 +280,15 @@ La única base de datos propia de Django (`n8n_django`) guarda sesiones y usuari
 
 - Tema: `pozo-silk` (dark, definido en `dj/theme/static_src/src/styles.css`)
 - El Dockerfile compila el CSS durante el build de la imagen
-- En desarrollo, `make tailwind-dev` recompila automáticamente
+- En desarrollo, `make tailwind WATCH=1` recompila automáticamente
 
 ---
 
 ## n8n-MCP — Control de n8n desde AI IDEs
 
 Permite a herramientas de AI (Cursor, Claude Code, etc.) crear, modificar y ejecutar workflows de n8n directamente desde el chat.
+
+El servidor MCP puede iniciarse y detenerse desde el Django Dashboard para ahorrar recursos cuando no está en uso.
 
 ### Herramientas disponibles
 
@@ -325,7 +321,7 @@ Permite a herramientas de AI (Cursor, Claude Code, etc.) crear, modificar y ejec
   "mcpServers": {
     "n8n": {
       "type": "http",
-      "url": "http://localhost:3001/mcp",
+      "url": "http://localhost:6005/mcp",
       "headers": { "Authorization": "Bearer <MCP_AUTH_TOKEN>" }
     }
   }
@@ -424,41 +420,42 @@ make restore
 make help                    # Ver todos los comandos disponibles
 
 # Entornos
-make dev                     # Levantar stack en modo desarrollo (con override local)
-make prod                    # Levantar stack en producción
+make dev                     # Levantar stack en modo desarrollo (verifica puertos primero)
+make prod                    # git pull + construir + levantar en producción
 make build                   # Construir imágenes Docker
 make rebuild                 # Reconstruir sin cache
 make stop                    # Detener servicios
+make check-ports             # Verificar que los puertos estén libres
+
+# Nginx
+make nginx-config            # Generar, instalar y recargar configuración de nginx
+
+# Logs
+make logs                    # Todos los servicios
+make logs SVC=n8n            # Logs de un servicio específico
+make logs SVC=django
+make logs SVC=api
+make logs SVC=gradio
+
+# Shells
+make shell SVC=django        # Shell en contenedor
+make shell SVC=api
+make shell SVC=gradio
+make shell SVC=n8n
+make shell SVC=postgres      # psql en PostgreSQL
+
+# Django
+make django CMD=migrate             # Ejecutar migraciones
+make django CMD=createsuperuser     # Crear superusuario
+
+# CSS
+make tailwind WATCH=1        # Watcher — recompila al guardar (desarrollo)
+make tailwind                # Compilar una vez (antes de make build)
 
 # Datos
 make backup                  # Backup de datos → backups/
 make restore                 # Restaurar desde backups/
 make clean                   # Eliminar contenedores, imágenes y volúmenes
-
-# Nginx
-make nginx-config            # Generar config de nginx desde .env
-
-# Logs
-make logs                    # Todos los servicios
-make logs-n8n
-make logs-gradio
-make logs-api
-make logs-django
-
-# Shells
-make shell-n8n
-make shell-gradio
-make shell-api
-make shell-django
-make shell-postgres          # psql en PostgreSQL
-
-# Django
-make migrate-django          # Ejecutar migraciones
-make createsuperuser-django  # Crear superusuario
-
-# CSS
-make tailwind-dev            # Watcher — recompila al guardar (desarrollo)
-make tailwind-build          # Compilar una vez (antes de make build)
 ```
 
 ---
@@ -469,12 +466,13 @@ Ver `.env.example` para la lista completa con descripción de cada variable.
 
 | Variable | Descripción |
 |---|---|
+| `COMPOSE_PROJECT_NAME` | Nombre del proyecto Docker Compose (default: `n8npozos`) |
 | `DOMAIN` | Dominio público (sin https://) |
-| `N8N_PORT` | Puerto local de n8n (default: 5679) |
-| `GRADIO_PORT` | Puerto local de Gradio (default: 7860) |
-| `API_PORT` | Puerto local de la API (default: 8009) |
-| `DJANGO_PORT` | Puerto local de Django (default: 8010) |
-| `MCP_PORT` | Puerto local del MCP (default: 3001) |
+| `N8N_PORT` | Puerto local de n8n (default: 6001) |
+| `GRADIO_PORT` | Puerto local de Gradio (default: 6002) |
+| `API_PORT` | Puerto local de la API (default: 6003) |
+| `DJANGO_PORT` | Puerto local de Django (default: 6004) |
+| `MCP_PORT` | Puerto local del MCP (default: 6005) |
 | `POSTGRES_USER` | Usuario de PostgreSQL |
 | `POSTGRES_PASSWORD` | Password de PostgreSQL |
 | `N8N_ENCRYPTION_KEY` | Cifra credenciales en n8n — no cambiar después del primer uso |
