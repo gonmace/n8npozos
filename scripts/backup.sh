@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script para hacer backup de volúmenes de Docker
+# Script para hacer backup de datos del proyecto
 
 set -e
 
@@ -8,35 +8,28 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 mkdir -p "$BACKUP_DIR"
 
-echo "💾 Creando backup de volúmenes..."
+echo "💾 Creando backup..."
 
-# Backup de PostgreSQL
-if docker volume ls | grep -q postgres_storage; then
+# Backup de PostgreSQL (bind mount)
+if [ -d "./postgres_storage" ] && [ "$(ls -A ./postgres_storage 2>/dev/null | grep -v .gitkeep)" ]; then
     echo "📦 Respaldando PostgreSQL..."
-    docker run --rm \
-        -v postgres_storage:/data \
-        -v "$(pwd)/$BACKUP_DIR":/backup \
-        alpine tar czf /backup/postgres_${TIMESTAMP}.tar.gz -C /data .
+    tar czf "${BACKUP_DIR}/postgres_${TIMESTAMP}.tar.gz" -C . postgres_storage
+    echo "   ✅ postgres_${TIMESTAMP}.tar.gz"
 fi
 
-# Backup de n8n
-if docker volume ls | grep -q n8n_storage; then
+# Backup de n8n (bind mount)
+if [ -d "./n8n_storage" ] && [ "$(ls -A ./n8n_storage 2>/dev/null | grep -v .gitkeep)" ]; then
     echo "📦 Respaldando n8n..."
-    docker run --rm \
-        -v n8n_storage:/data \
-        -v "$(pwd)/$BACKUP_DIR":/backup \
-        alpine tar czf /backup/n8n_${TIMESTAMP}.tar.gz -C /data .
+    tar czf "${BACKUP_DIR}/n8n_${TIMESTAMP}.tar.gz" -C . n8n_storage
+    echo "   ✅ n8n_${TIMESTAMP}.tar.gz"
 fi
 
-# Backup de ChromaDB
-if docker volume ls | grep -q chroma_storage; then
+# Backup de ChromaDB (bind mount)
+if [ -d "./chroma_storage" ] && [ "$(ls -A ./chroma_storage 2>/dev/null | grep -v .gitkeep)" ]; then
     echo "📦 Respaldando ChromaDB..."
-    docker run --rm \
-        -v chroma_storage:/data \
-        -v "$(pwd)/$BACKUP_DIR":/backup \
-        alpine tar czf /backup/chroma_${TIMESTAMP}.tar.gz -C /data .
+    tar czf "${BACKUP_DIR}/chroma_${TIMESTAMP}.tar.gz" -C . chroma_storage
+    echo "   ✅ chroma_${TIMESTAMP}.tar.gz"
 fi
 
+echo ""
 echo "✅ Backup completado en $BACKUP_DIR"
-
-

@@ -4,11 +4,16 @@
 services:
   gradio:
     build:
-      context: ..
+      context: ../..
       dockerfile: docker/gradio/Dockerfile
     environment:
       ENV: production
       DEBUG: "false"
     restart: always
     # No montar volúmenes en producción, usar imagen construida
+
+  django:
+    restart: always
+    environment:
+      DEBUG: "False"
 

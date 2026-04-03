@@ -1,0 +1,1398 @@
+{
+  "name": "03_Auditoria",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "sessionId"
+            },
+            {
+              "name": "state"
+            },
+            {
+              "name": "flag"
+            },
+            {
+              "name": "orquestador"
+            },
+            {
+              "name": "subagente"
+            }
+          ]
+        }
+      },
+      "id": "c055762a-8fe7-4141-a639-df2372f30060",
+      "typeVersion": 1.1,
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -960,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw-col",
+                    "leftValue": "={{ $json.state }}",
+                    "rightValue": "collecting",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "collecting"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw-quo",
+                    "leftValue": "={{ $json.state }}",
+                    "rightValue": "quoted",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "quoted"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw-con",
+                    "leftValue": "={{ $json.state }}",
+                    "rightValue": "confirmed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "confirmed"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw-awp",
+                    "leftValue": "={{ $json.state }}",
+                    "rightValue": "awaiting_phone",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_phone"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-state",
+      "name": "Switch State",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        64,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pc-06",
+              "name": "criterios_estado",
+              "type": "string",
+              "value": "- Cliente pidio precio/cotizacion: DEBE pedir que comparta su ubicacion. Solo sirve la ubicacion compartida de Whatsapp, NO una direccion escrita.\n- La cotización se realiza por un sistema y es por eso que ES PRECISO contar con la ubicación.\n- Si el mensaje solicita la ubicación del cliente, debe indicar que la comparta \"por este medio\". No debe mencionar mapas. Si esto ocurre, debe considerarse un incumplimiento.\n- Repeticion de frase de ubicacion: si el bot repite LITERALMENTE la misma frase de solicitud de ubicacion mas de una vez sin variacion, penalizar score (no puede ser excelente ni buena) y marcar ajustar_workflow=true. La respuesta debe variar: agradecer, explicar como compartir (debe parecer humano).\n- Llego ubicacion del cliente: DEBE cotizar inmediatamente usando pricing by location agent.\n- NUNCA dar precio sin haber recibido ubicacion compartida previamente\n- Pregunta sobre informacion del servicio (disponibilidad, caracteristicas, preguntas generales): debe usar service info agent.\n- Pregunta sobre alcance del servicio (si aplica a su caso, condiciones, cobertura): debe usar service scope agent."
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "except",
+        "excludeFields": "state",
+        "options": {}
+      },
+      "id": "prompt-collecting",
+      "name": "Prompt Collecting",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        288,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pq-06",
+              "name": "criterios",
+              "type": "string",
+              "value": "- Ubicacion: El estado 'quoted' en el trigger es el estado DESPUES de la respuesta. Si el usuario envio ubicacion y el bot respondio con precio (subagente pricing by location agent), es la PRIMERA ubicacion: CORRECTO. new location quotation SOLO cuando el usuario EXPLICITAMENTE quiere cotizar en otra direccion (ej: 'quiero cotizar en otro lugar'). Si el usuario reenvia ubicacion cuando ya habia cotizacion previa en el historial, el bot debe recordar que ya se cotizo - NO re-cotizar. No penalizar por usar pricing by location agent cuando es la primera ubicacion.\n- Confirmacion (explicita o blanda): DEBE enrutar a confirmation agent. Si no lo hizo: Order Orchestrator.\n  IMPORTANTE: Un simple \"ok\" sin contexto adicional NO es confirmacion; el bot debe tratarlo como interes sin confirmacion y puede responder pidiendo confirmacion explicita. No penalizar por no escalar en ese caso.\n- Objecion de precio: NO modificar precio, NO descuentos. Si ofrecio descuento: price objection agent.\n- NO confirmar fechas/horarios especificos. Si lo hizo: Order Orchestrator.\n- Respuesta de RAG incorrecta: service info agent.\n- Si el cliente realizo mas de una consulta en el mismo mensaje: el bot DEBE responder TODAS antes de avanzar. Ignorar cualquier consulta es un ERROR, penalizar segun cantidad de consultas ignoradas."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prompt-quoted",
+      "name": "Prompt Quoted",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        288,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pcon-07",
+              "name": "criterios_estado",
+              "type": "string",
+              "value": "- En WhatsApp: solicitar nombre directamente es correcto. Pedir telefono en esta etapa es ERROR CRITICO, score <= 3. \n- Flujo sin telefono pendiente: debe pedir nombre al cliente y validarlo con la herramienta validate name.\n- Pide nombre mas de 2 veces sin avanzar el flujo: ERROR.\n- Da fechas o horarios especificos al cliente: ERROR. \n- Validacion del nombre incorrecta o inconsistente con las reglas del agente\n- Gestion del telefono incorrecta (lo pide en canal equivocado, o no usa la herramienta telefono correctamente)"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "except",
+        "excludeFields": "state",
+        "options": {}
+      },
+      "id": "prompt-confirmed",
+      "name": "Prompt Confirmed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        288,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pa-06",
+              "name": "criterios_estado",
+              "type": "string",
+              "value": "- Codigo con formato incorrecto (no son exactamente 6 digitos numericos): DEBE rechazarlo. Si lo acepto o proceso: ERROR.\n- Codigo con formato correcto pero caducado: DEBE responder UNICAMENTE el mensaje de caducidad exacto configurado, sin agregar texto adicional. Cualquier adicion o variacion es ERROR.\n- Ofrece reenvio de codigo sin que el cliente lo haya solicitado explicitamente: ERROR. nodo_problema = Awaiting phone Agent (herramienta new_code).\n- Solicita nuevo numero de telefono cuando no corresponde (ya existe uno registrado y el cliente no lo pidio): ERROR."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prompt-awaiting",
+      "name": "Prompt Awaiting Phone",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        288,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const tr = $('When Executed by Another Workflow').first().json;\nconst ch = $('Extract chat history').first().json;\n\nconst criteriosEstado = $input.first().json.criterios_estado || '';\nconst criteriosGenerales = $('Prompt General').first().json.criterios_generales || '';\n\nconst reglaCoherencia =\n  'evaluacion DEBE corresponder al score_global:\\n' +\n  '- score 8-10 -> evaluacion: excelente\\n' +\n  '- score 6-7  -> evaluacion: buena\\n' +\n  '- score 4-5  -> evaluacion: aceptable\\n' +\n  '- score 1-3  -> evaluacion: deficiente';\n\nconst reglaScoreVsMejora =\n  '=== REGLA score vs mejora_sugerida ===\\n' +\n  'Si propones una mejora_sugerida concreta y relevante (no vacia, no \"Ninguna\"), el score NO puede ser 9-10. Excelente = sin mejoras significativas posibles. Ajusta el score segun la magnitud de la mejora sugerida.\\n';\n\nconst reglaAjustar =\n  '=== REGLA ajustar_workflow ===\\n' +\n  'ajustar_workflow: true cuando el problema puede resolverse modificando el prompt del agente (hay nodo_problema identificable). Ej: ignorar consulta del cliente, respuesta incompleta, reglas que no cumple el agente. Marcar false solo cuando el problema es de infraestructura o claramente no puede solucionarse con cambios de prompt.\\n';\n\nif (!ch.human && !ch.ai) {\n  return [{ json: { input: 'Devuelve json con score_global=0, evaluacion: \"deficiente\", nodo_problema: \"ninguno\", observaciones: \"Sin turno valido para evaluar.\", mejora_sugerida: \"\", ajustar_workflow: false' } }];\n}\n\nconst historialSeccion = ch.noHistory\n  ? '(Primer turno de la sesion, sin historial previo)'\n  : '=== HISTORIAL PREVIO ===\\n' + ch.chat_history;\n\nconst input =\n  'Eres Auditor de Calidad Conversacional para bot de ventas.\\n' +\n  'Evalua la ULTIMA respuesta del asistente considerando el cumplimiento de reglas, criterios generales y calidad del lenguaje.\\n' +\n  'Estado: ' + (tr.state || '').toUpperCase() + '. Orquestador: ' + (tr.orquestador || '') + '. Sub-agente: ' + (tr.subagente || '(no declarado)') + '.\\n\\n' +\n  historialSeccion + '\\n\\n' +\n  '=== CRITERIOS DE EVALUACIÓN ===\\n' +\n  criteriosGenerales + '\\n' +\n  criteriosEstado + '\\n\\n' +\n  '=== REGLA DE COHERENCIA score_global / evaluacion ===\\n' +\n  'OBLIGATORIO: ' + reglaCoherencia + '\\n\\n' +\n  reglaScoreVsMejora + '\\n' +\n  reglaAjustar + '\\n' +\n  'Devuelve SOLO estos campos: score_global, evaluacion, nodo_problema, observaciones, mejora_sugerida, ajustar_workflow.\\n\\n' +\n  '=== TURNO A EVALUAR ===\\n' +\n  'Cliente: ' + ch.human + '\\n' +\n  'Asistente: ' + ch.ai;\n\nreturn [{ json: { input } }];"
+      },
+      "id": "build-input",
+      "name": "Build Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "o3",
+          "mode": "list",
+          "cachedResultName": "o3"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        752,
+        848
+      ],
+      "id": "519b1196-daaa-4390-8b01-785b20fd8648",
+      "name": "OpenAI Chat Model",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "mode": "name",
+          "value": "auditoria"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {
+            "ajustar_workflow": false
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "input",
+              "displayName": "input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "score_global",
+              "displayName": "score_global",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "evaluacion",
+              "displayName": "evaluacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "observaciones",
+              "displayName": "observaciones",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "mejora_sugerida",
+              "displayName": "mejora_sugerida",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "flag",
+              "displayName": "flag",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "orquestador",
+              "displayName": "orquestador",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "subagente",
+              "displayName": "subagente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "ajustar_workflow",
+              "displayName": "ajustar_workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prompt_ajuste",
+              "displayName": "prompt_ajuste",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "save-audit-datatable",
+      "name": "Save Audit Result",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-ajustar",
+              "leftValue": "={{ $json.ajustar_workflow }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-ajustar-workflow",
+      "name": "IF ajustar_workflow",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1760,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "o3",
+          "mode": "list",
+          "cachedResultName": "o3"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "openai-ajuste",
+      "name": "OpenAI Ajuste",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        2640,
+        864
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        -672,
+        848
+      ],
+      "id": "022eabdf-7506-404f-ba4d-8711b74754a7",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "vSOjV9WqJViWVGVX",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        -736,
+        624
+      ],
+      "id": "003d872c-b22f-437e-828b-7a431b05736a",
+      "name": "chat_history"
+    },
+    {
+      "parameters": {
+        "jsCode": "const t = $json.messages;\n\nconst human = t[t.length-1].human;\nconst ai = t[t.length-1].ai;\n\nconst noHistory = t.length <= 1 ? true : false\n\nconst chat_history = t\n  .slice(0, -1)\n  .map(m => `human: ${m.human}\\nai: ${m.ai}`)\n  .join(\"\\n\\n\");\n\nconst state = $('When Executed by Another Workflow').first().json.state\n\nreturn [{ json: {\n  state,\n  human,\n  ai,\n  chat_history,\n  noHistory\n} }];"
+      },
+      "id": "extract-last-turn",
+      "name": "Extract chat history",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "delete",
+        "lastMessagesCount": 4
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        -960,
+        1248
+      ],
+      "id": "96230908-b6a3-432e-ac46-2d9bff8619f2",
+      "name": "del all1"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "=59169212717",
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        -896,
+        1472
+      ],
+      "id": "a3cdfa65-4966-412e-a54b-6abcfd168875",
+      "name": "Postgres Chat Memory5",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "postgres": {
+          "id": "vSOjV9WqJViWVGVX",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.input }}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "id": "evaluar-agent",
+      "name": "Evaluar",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        736,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"score_global\": 8,\n  \"evaluacion\": \"excelente\",\n  \"observaciones\": \"La respuesta cumple con todos los criterios.\",\n  \"mejora_sugerida\": \"Ninguna.\",\n  \"ajustar_workflow\": false\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        880,
+        848
+      ],
+      "id": "6055ebb4-2ee5-41cf-9c57-d3b880ad62fd",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4c053629-c55c-4d16-90c5-8724c117df21",
+              "name": "score_global",
+              "value": "={{ $json.output.score_global }}",
+              "type": "number"
+            },
+            {
+              "id": "0c15596b-a90d-4473-9f35-15ab0ae84741",
+              "name": "evaluacion",
+              "value": "={{ $json.output.evaluacion }}",
+              "type": "string"
+            },
+            {
+              "id": "e8e36ee3-716a-4cd8-a54b-51e3c1a1458c",
+              "name": "observaciones",
+              "value": "={{ $json.output.observaciones }}",
+              "type": "string"
+            },
+            {
+              "id": "4a149a51-1f48-4995-91bf-b773fabab049",
+              "name": "mejora_sugerida",
+              "value": "={{ $json.output.mejora_sugerida }}",
+              "type": "string"
+            },
+            {
+              "id": "27202d23-bdcd-48a4-9c0a-15612386272f",
+              "name": "ajustar_workflow",
+              "value": "={{ $json.output.ajustar_workflow }}",
+              "type": "boolean"
+            },
+            {
+              "id": "c5ecf2d8-d65f-4914-b34d-973c7bb6245d",
+              "name": "input",
+              "value": "={{ $('Extract chat history').item.json.human }}",
+              "type": "string"
+            },
+            {
+              "id": "4e50ff09-09b9-4acb-a551-420084f7bfc7",
+              "name": "output",
+              "value": "={{ $('Extract chat history').item.json.ai }}",
+              "type": "string"
+            },
+            {
+              "id": "c557b1df-9055-4062-976b-e0791849ef50",
+              "name": "sessionId",
+              "value": "={{ $('When Executed by Another Workflow').item.json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "b6da1d02-9dfb-43c6-aa48-64ca28fae71c",
+              "name": "state",
+              "value": "={{ $('When Executed by Another Workflow').item.json.state }}",
+              "type": "string"
+            },
+            {
+              "id": "dac4d6e8-117c-4e46-a2c2-caeaac84e0c8",
+              "name": "flag",
+              "value": "={{ $('When Executed by Another Workflow').item.json.flag }}",
+              "type": "string"
+            },
+            {
+              "id": "eaebabc5-0b4a-4e97-8ccd-5a9bde517426",
+              "name": "orquestador",
+              "value": "={{ $('When Executed by Another Workflow').item.json.orquestador }}",
+              "type": "string"
+            },
+            {
+              "id": "d4516f85-4baf-477d-b501-1c691c71fe13",
+              "name": "subagente",
+              "value": "={{ $('When Executed by Another Workflow').item.json.subagente }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1088,
+        624
+      ],
+      "id": "e1e00a4a-c176-4ca9-80cc-edf1b8ee303a",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "url": "https://n8npozos.magoreal.com/api/v1/workflows/wY2zlf23Ju6Yiiib",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "n8nApi",
+        "options": {}
+      },
+      "id": "get-workflow-node",
+      "name": "get 02_Agentes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        2208,
+        624
+      ],
+      "credentials": {
+        "n8nApi": {
+          "id": "uNi71j9q3lEbXxZW",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=prompt System:  \"\"\"{{ $json.systemPrompt }}\"\n\nobservación: \"\"\"{{ $('Sanitize for DB').item.json.observaciones }}\"\n\nmejora sugerida: \"\"\"{{ $('Sanitize for DB').item.json.mejora_sugerida }}\"",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Eres especialista en evaluar y mejorar prompts para agentes LLM.\n\nRecibes:\n- El prompt System actual del agente\n- La observación detectada en la auditoría\n- La mejora sugerida\n\nTu objetivo es decidir si el problema puede resolverse modificando el prompt y, si es así, generar una propuesta concreta de prompt_ajuste.\n\n=== CRITERIO nodo_problema ===\nDevuelve nodo_problema: true cuando la mejora sugerida puede lograrse añadiendo o modificando instrucciones en el prompt. Por ejemplo:\n- \"Enrutar al Confirmation Agent\" → SÍ: se puede reforzar en el prompt la regla de enrutamiento\n- \"No modificar precio\" → SÍ: se puede añadir explícitamente en el prompt\n- \"No dar fechas específicas\" → SÍ: se puede aclarar en el prompt\n- Errores de lógica o flujo que el prompt puede prevenir → SÍ\n\nDevuelve nodo_problema: false SOLO cuando el problema es claramente de infraestructura, herramientas, o configuración externa que el prompt no puede controlar.\n\nCuando dudes, prioriza nodo_problema: true y propón un prompt_ajuste. Es preferible ofrecer una propuesta que el humano pueda revisar.\n\n=== REGLAS PARA prompt_ajuste ===\n- El prompt debe ser GENÉRICO, no depender del caso concreto de la observación\n- Mantén el propósito original del prompt\n- Modifica lo mínimo necesario para resolver el problema\n- No incluyas ejemplos\n- Respeta expresiones JavaScript con formato {{ }}\n- Si la mejora habla de \"enrutar a X\" o \"usar Y\": añade o refuerza esa instrucción de forma explícita en el prompt\n\n=== FORMATO DE RESPUESTA ===\nSiempre responde SOLO JSON válido, sin texto adicional:\n\nSi propones cambio de prompt:\n{\n  \"prompt_ajuste\": \"<nuevo prompt completo con las mejoras incorporadas>\",\n  \"nodo_problema\": true,\n  \"justificacion\": \"<breve justificación>\"\n}\n\nSi el problema NO es del prompt (infraestructura, herramientas, etc.):\n{\n  \"prompt_ajuste\": \"\",\n  \"nodo_problema\": false,\n  \"justificacion\": \"<breve justificación>\"\n}",
+          "passthroughBinaryImages": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2656,
+        624
+      ],
+      "id": "39519661-8356-4082-84dc-e75bee316bc6",
+      "name": "AI Agent",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\"prompt_ajuste\": \"string\",\n\"nodo_problema\": false,\n\"justificacion\": \"string\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2832,
+        864
+      ],
+      "id": "812a8449-1a88-4669-aa53-6ed397d785a8",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "96380df6-7935-4020-bed1-da0d6d1e9633",
+              "leftValue": "={{ $json.output.nodo_problema }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3008,
+        624
+      ],
+      "id": "9ae62ee4-dd0d-4c70-9404-1ef04f45a237",
+      "name": "Agente Prompt Ajustado"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "auditoria"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $('Save Audit Result').item.json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "prompt_ajuste": "={{ $json.output.prompt_ajuste }}",
+            "nodo_ajuste_name": "={{ $('Extract prompt').item.json.nodoAgente }}",
+            "nodo_ajuste_id": "={{ $('Extract prompt').item.json.id }}",
+            "prompt_inicial": "={{ $('Extract prompt').item.json.systemPrompt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "input",
+              "displayName": "input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "score_global",
+              "displayName": "score_global",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "evaluacion",
+              "displayName": "evaluacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "observaciones",
+              "displayName": "observaciones",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "mejora_sugerida",
+              "displayName": "mejora_sugerida",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "flag",
+              "displayName": "flag",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "orquestador",
+              "displayName": "orquestador",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "subagente",
+              "displayName": "subagente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "ajustar_workflow",
+              "displayName": "ajustar_workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "prompt_inicial",
+              "displayName": "prompt_inicial",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prompt_ajuste",
+              "displayName": "prompt_ajuste",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "nodo_ajuste_name",
+              "displayName": "nodo_ajuste_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "nodo_ajuste_id",
+              "displayName": "nodo_ajuste_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d042140c-1495-4af9-b259-6eb9fc79056b",
+      "name": "Save Audit prompt",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        3232,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pg-01",
+              "name": "criterios_generales",
+              "type": "string",
+              "value": "- Consultas multiples en un mismo mensaje: el bot DEBE responder TODAS las preguntas antes de avanzar al siguiente paso del flujo. Ignorar cualquier consulta del cliente es un ERROR. Penalizar segun cantidad de consultas ignoradas (mayor cantidad = menor score).\n- Proporcionalidad respuesta/input: la extension y complejidad de la respuesta debe ser proporcional al mensaje del cliente. Respuestas largas ante inputs cortos o vagos sin explorar la inquietud primero son inapropiadas.\n- Lenguaje y tono: cordial, profesional y empatico. No frio ni robotico. Sin jerga tecnica innecesaria.\n- Claridad: la respuesta es facil de entender, sin ambiguedades ni dobles interpretaciones.\n- Concision: no incluye informacion innecesaria ni repite lo que el cliente ya dijo en el mismo mensaje.\n- Naturalidad: el lenguaje fluye de forma natural, no suena a plantilla o respuesta automatica generica.\n- Ortografia y gramatica: sin errores evidentes.\n- Escalacion a manager: si el cliente solicita explicitamente hablar con una persona, el bot DEBE escalar al manager. Si no lo hizo es ERROR.\n- Coherencia con historial: la respuesta no debe contradecir informacion previamente entregada en la misma sesion.\n- nodo_problema debe ser el nombre EXACTO del nodo tal como aparece en 02_Agentes (ej: Pricing Orchestrator, Order Orchestrator, Confirmation Orchestrator, Awaiting phone Agent, pricing by location agent, price objection agent, new location quotation, confirmation agent, service info agent, service scope agent, validate name). No inventar nombres."
+            },
+            {
+              "id": "89efda40-55a6-4034-917d-284d739d90ac",
+              "name": "state",
+              "value": "={{ $json.state }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prompt-general",
+      "name": "Prompt General",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -160,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\n\nconst nodo = (item.json.subagente && item.json.subagente !== item.json.orquestador)\n  ? item.json.subagente\n  : item.json.orquestador;\n\nreturn [\n  {\n    json: {\n      nodo\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1984,
+        624
+      ],
+      "id": "f3b97257-ade2-41cb-b032-e3f4b86f26e1",
+      "name": "nodo"
+    },
+    {
+      "parameters": {
+        "jsCode": "const auditData = $('nodo').first().json;\nlet nodoAgente = auditData.nodo;\nnodoAgente = nodoAgente.replace(/_/g, \" \");\n\nconst workflow = $input.first().json;\n\nconst nodos = workflow.nodes || [];\n\nconst nodo = nodos.find(n => n.name === nodoAgente);\n\nconst systemPrompt = nodo?.parameters?.systemMessage || nodo?.parameters?.options?.systemMessage || nodo?.parameters?.text || null;\n\nconst id = nodo.id\n\nreturn [{\n  json: {\n    nodoAgente,\n    id,\n    systemPrompt\n  }\n}];"
+      },
+      "id": "extract-system-message",
+      "name": "Extract prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2432,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sanitiza strings para PostgreSQL: elimina null byte (0x00) que causa 'invalid byte sequence for encoding UTF8'\nfunction sanitize(val) {\n  if (typeof val === 'string') return val.replace(/\\x00/g, '');\n  if (val && typeof val === 'object' && !Array.isArray(val)) {\n    const out = {};\n    for (const k of Object.keys(val)) out[k] = sanitize(val[k]);\n    return out;\n  }\n  return val;\n}\nconst items = $input.all();\nreturn items.map(item => ({ json: sanitize(item.json) }));"
+      },
+      "id": "sanitize-for-db-001",
+      "name": "Sanitize for DB",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        624
+      ]
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "sessionId": "59169212717",
+          "state": "quoted",
+          "flag": "",
+          "orquestador": "Order Orchestrator",
+          "subagente": ""
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "chat_history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chat_history": {
+      "main": [
+        [
+          {
+            "node": "Extract chat history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "chat_history",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract chat history": {
+      "main": [
+        [
+          {
+            "node": "Prompt General",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt General": {
+      "main": [
+        [
+          {
+            "node": "Switch State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch State": {
+      "main": [
+        [
+          {
+            "node": "Prompt Collecting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prompt Quoted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prompt Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prompt Awaiting Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Collecting": {
+      "main": [
+        [
+          {
+            "node": "Build Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Quoted": {
+      "main": [
+        [
+          {
+            "node": "Build Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Confirmed": {
+      "main": [
+        [
+          {
+            "node": "Build Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Awaiting Phone": {
+      "main": [
+        [
+          {
+            "node": "Build Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Input": {
+      "main": [
+        [
+          {
+            "node": "Evaluar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Evaluar",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Evaluar",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluar": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Sanitize for DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Audit Result": {
+      "main": [
+        [
+          {
+            "node": "IF ajustar_workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF ajustar_workflow": {
+      "main": [
+        [
+          {
+            "node": "nodo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get 02_Agentes": {
+      "main": [
+        [
+          {
+            "node": "Extract prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Ajuste": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Agente Prompt Ajustado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente Prompt Ajustado": {
+      "main": [
+        [
+          {
+            "node": "Save Audit prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory5": {
+      "ai_memory": [
+        [
+          {
+            "node": "del all1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "nodo": {
+      "main": [
+        [
+          {
+            "node": "get 02_Agentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sanitize for DB": {
+      "main": [
+        [
+          {
+            "node": "Save Audit Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "5d6e39d5-d4e3-41c5-b3f1-de5a98f9ed4a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d9c5adb5b47dc1dff2717f3c50997b1de6d705b83f6fc3647d372ee5b662ea9d"
+  },
+  "id": "uKS6EHcbauOXTZBd",
+  "tags": []
+}

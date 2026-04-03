@@ -1,0 +1,194 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Chat History | n8n Manager{% endblock %}
+
+{% block content %}
+    <div class="flex h-[calc(100vh-8rem)] bg-base-100 shadow rounded-lg overflow-hidden border border-base-300">
+        
+        <!-- Sidebar: Session List -->
+        <div class="w-1/3 border-r border-base-300 overflow-y-auto bg-base-200">
+            <div class="p-4 border-b border-base-300">
+                <h2 class="text-lg font-medium text-base-content">Clientes</h2>
+            </div>
+            <ul class="divide-y divide-base-100">
+                {% for session in sessions %}
+                <li>
+                    <a href="?session_id={{ session.id }}" 
+                       class="block w-full text-left px-4 py-3 transition focus:outline-none {% if session.active %}bg-primary text-primary-content border-l-4 border-accent shadow-inner{% else %}hover:bg-base-300 text-base-content{% endif %}">
+                        <div class="flex justify-between items-baseline mb-1">
+                            <span class="text-sm font-semibold truncate {% if session.active %}text-primary-content{% else %}text-base-content{% endif %}">
+                                {{ session.id }}{% if session.precio %} - {{ session.precio }}{% endif %}
+                            </span>
+                        </div>
+                    </a>
+                </li>
+                {% empty %}
+                <li class="p-4 text-sm text-neutral-content text-center">No hay sesiones activas.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Main: Chat Content -->
+        <div class="w-2/3 flex flex-col h-full bg-base-100">
+            {% if active_session_id %}
+                <!-- Header -->
+                <div class="px-6 py-5 border-b border-base-200 bg-base-100 flex justify-between items-end shrink-0">
+                    <div class="flex flex-col gap-1">
+                        <h3 class="font-bold uppercase tracking-widest text-xs mb-1">Conversación</h3>
+                        <div class="flex items-center gap-3">
+                            <span class="badge badge-outline badge-sm font-mono">{{ active_session_id }}</span>
+                            {% if messages %}
+                            <button type="button" id="download-chat-md" class="btn btn-sm btn-ghost gap-2" title="Descargar historial en Markdown">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                Descargar .md
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    {% if active_session %}
+                    <div class="flex flex-col items-end gap-2">
+                        <div class="flex items-center gap-6">
+                            {% if active_session.precio %}
+                                <div class="flex flex-col items-end">
+                                    <span class="text-[9px] text-base-content uppercase font-bold tracking-widest opacity-60">Precio</span>
+                                    <span class="text-lg font-black text-success leading-none">Bs. {{ active_session.precio }}</span>
+                                </div>
+                            {% endif %}
+                            
+                            {% if active_session.fecha_precio %}
+                                <div class="flex flex-col items-end">
+                                    <span class="text-[9px] text-base-content uppercase font-bold tracking-widest opacity-60">Fecha Cotización</span>
+                                    <span class="text-md font-bold text-base-content opacity-90 leading-none">{{ active_session.fecha_precio }}</span>
+                                </div>
+                            {% endif %}
+
+                            {% if active_session.ubicacion %}
+                                <div class="flex flex-col items-end">
+                                    <span class="text-[9px] text-base-content uppercase font-bold tracking-widest opacity-60 mb-1">Ubicación</span>
+                                    <a href="{{ active_session.ubicacion }}" target="_blank" class="btn btn-xs btn-primary font-bold px-3">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+                                        </svg>
+                                        Mapa
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% if active_session.updatedAt %}
+                            <span class="text-[9px] text-base-content italic">Última actualización: {{ active_session.updatedAt }}</span>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <span class="badge badge-ghost badge-sm opacity-30 italic">Sin datos de sesión</span>
+                    {% endif %}
+                </div>
+
+                <!-- Messages Area -->
+                <div class="flex-1 overflow-y-auto p-6" id="chat-container">
+                    {% for msg in messages %}
+                        <div class="chat {% if msg.message.type == 'human' %}chat-start{% else %}chat-end{% endif %}">
+                            <div class="chat-bubble {% if msg.message.type == 'human' %}chat-bubble-neutral{% else %}chat-bubble-accent{% endif %}">
+                                {{ msg.message.content|urlize|linebreaksbr }}
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="hero h-full bg-base-100">
+                            <div class="hero-content text-center">
+                              <div class="max-w-md">
+                                <h1 class="text-2xl font-bold text-neutral-content opacity-30">Sin mensajes</h1>
+                                <p class="py-6 text-neutral-content">Esta sesión no tiene historial todavía.</p>
+                              </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <!-- Empty State -->
+                <div class="hero h-full bg-base-100">
+                    <div class="hero-content text-center">
+                        <div class="max-w-md">
+                            <svg class="mx-auto h-12 w-12 text-neutral-content opacity-20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                            </svg>
+                            <h2 class="text-xl font-bold text-base-content">Selecciona un cliente</h2>
+                            <p class="py-2 text-neutral-content">Elige una conversación de la lista para ver el historial.</p>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if chat_export_data %}
+    {{ chat_export_data|json_script:"chat-export-data" }}
+    {% endif %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatContainer = document.getElementById('chat-container');
+            if (chatContainer) {
+                // Configurar enlaces externos
+                const links = chatContainer.querySelectorAll('.chat-bubble a');
+                links.forEach(link => {
+                    link.setAttribute('target', '_blank');
+                    link.setAttribute('rel', 'noopener noreferrer');
+                    link.classList.add('underline', 'hover:text-blue-200');
+                });
+
+                // Scroll automático hasta abajo cuando se activa una sesión
+                {% if active_session_id %}
+                function scrollToBottom() {
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+                
+                // Hacer scroll inmediatamente
+                scrollToBottom();
+                
+                // Esperar a que el contenido se renderice completamente
+                setTimeout(scrollToBottom, 100);
+                
+                // También hacer scroll después de que las imágenes y otros recursos se carguen
+                window.addEventListener('load', scrollToBottom);
+                
+                // Hacer scroll cuando el contenido cambie (por si hay contenido dinámico)
+                const observer = new MutationObserver(function() {
+                    scrollToBottom();
+                });
+                observer.observe(chatContainer, { childList: true, subtree: true });
+                {% endif %}
+            }
+
+            // Botón descargar Markdown
+            const downloadBtn = document.getElementById('download-chat-md');
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', function() {
+                    const dataEl = document.getElementById('chat-export-data');
+                    if (!dataEl || !dataEl.textContent) return;
+                    try {
+                        const data = JSON.parse(dataEl.textContent);
+                        const lines = ['# Chat History', '', `**Sesión:** ${data.sessionId || 'N/A'}`, '', '---', ''];
+                        (data.messages || []).forEach(function(msg) {
+                            const role = msg.type === 'human' ? 'Usuario' : 'Asistente';
+                            lines.push(`## ${role}`, '');
+                            lines.push((msg.content || '').replace(/\r\n/g, '\n').replace(/\n/g, '\n\n'));
+                            lines.push('');
+                        });
+                        const md = lines.join('\n');
+                        const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `chat-${(data.sessionId || 'session').replace(/[^a-zA-Z0-9_-]/g, '_')}.md`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    } catch (e) {
+                        console.error('Error al exportar:', e);
+                    }
+                });
+            }
+        });
+    </script>
+    </div>
+{% endblock %}

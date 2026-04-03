@@ -44,6 +44,7 @@ COLLECTION_NAME = os.getenv("CHROMA_COLLECTION", "pozos")
 GRADIO_AUTH_USERNAME = os.getenv("GRADIO_AUTH_USERNAME", "admin")
 GRADIO_AUTH_PASSWORD = os.getenv("GRADIO_AUTH_PASSWORD", "admin123")
 GRADIO_SERVER_PORT = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
+GRADIO_ROOT_PATH = os.getenv("GRADIO_ROOT_PATH", "")
 ENV = os.getenv("ENV", "production")
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
@@ -827,6 +828,7 @@ if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0",
         server_port=GRADIO_SERVER_PORT,
+        root_path=GRADIO_ROOT_PATH,
         auth=(GRADIO_AUTH_USERNAME, GRADIO_AUTH_PASSWORD),
         share=False,
         show_error=DEBUG

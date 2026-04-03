@@ -4,7 +4,7 @@
 
 set -e
 
-CHROMA_DIR="deploy/chroma_storage"
+CHROMA_DIR="chroma_storage"
 
 echo "📁 Inicializando directorio de ChromaDB..."
 

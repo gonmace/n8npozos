@@ -1,0 +1,3377 @@
+{
+  "name": "02_Agentes",
+  "nodes": [
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "=o3",
+          "mode": "id"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -32,
+        272
+      ],
+      "id": "6d8fe0d8-d5ad-4aeb-ba4f-4fe90b453112",
+      "name": "OpenAI o3",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "maxTries": 3,
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "0zB8nzU75uBn6rRp",
+          "mode": "list",
+          "cachedResultName": "pozos_clientes",
+          "cachedResultUrl": "/projects/D5S4DzsCuzzjBHo5/datatables/0zB8nzU75uBn6rRp"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "lat": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('lat', ``, 'number') }}",
+            "lon": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('lon', ``, 'number') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "contacto",
+              "displayName": "contacto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "lat",
+              "displayName": "lat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "fecha_precio",
+              "displayName": "fecha_precio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "dist_from_scz",
+              "displayName": "dist_from_scz",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "lon",
+              "displayName": "lon",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "precio",
+              "displayName": "precio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTableTool",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        704
+      ],
+      "id": "e370b2b0-917b-44e9-98a9-e2ca2c34af74",
+      "name": "save_lat_lon"
+    },
+    {
+      "parameters": {
+        "toolDescription": "usa esta herramienta cuando llegue el json con el siguiente formato:\n {\n \"response\": {\n\"lat\": -17.805631,\n\"lon\": -63.2214449,\n\"telefono\": \"+59167728817\"  \n}",
+        "method": "POST",
+        "url": "https://pozosscz.com/api/v1/contratar/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "lat",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters0_Value', ``, 'string') }}"
+            },
+            {
+              "name": "lon",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters1_Value', ``, 'string') }}"
+            }
+          ]
+        },
+        "options": {},
+        "optimizeResponse": true,
+        "fieldsToInclude": "selected",
+        "fields": "precio,distance_scz"
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [
+        336,
+        704
+      ],
+      "id": "baca0869-f650-44d3-b1db-841657b8eab6",
+      "name": "obtener_precio",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "description": "Redondea un precio hacia abajo a la decena más cercana. Recibe un número (precio) y devuelve el valor ajustado. Ejemplo: 153 → 150, 287 → 280.",
+        "jsCode": "try {\n  const raw = typeof query === 'object' && query !== null\n    ? (query.precio ?? query.query ?? query.value ?? query)\n    : query;\n  const num = Number(raw);\n  if (!Number.isFinite(num)) {\n    return JSON.stringify({ error: 'Valor no numérico', recibido: String(raw) });\n  }\n  const result = Math.floor(num / 10) * 10;\n  return String(result);\n} catch (e) {\n  return JSON.stringify({ error: (e && e.message) || 'Error en ajustar_precio' });\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        480,
+        704
+      ],
+      "id": "b7674987-0a5e-4fab-8e18-96d93ec566a1",
+      "name": "ajustar_precio"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        32,
+        704
+      ],
+      "id": "9db7f215-f28d-4be0-aa09-d5c3954306df",
+      "name": "gtp-4.1mini",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "maxTries": 3,
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "o3",
+          "mode": "list",
+          "cachedResultName": "o3"
+        },
+        "responsesApiEnabled": false,
+        "options": {
+          "maxRetries": 2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -304,
+        1280
+      ],
+      "id": "9d8111a6-1a01-4a70-98d7-b887463acd38",
+      "name": "OpenAI o",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        1776
+      ],
+      "id": "7687af7d-cd78-4c82-b942-f392d984f0e7",
+      "name": "gtp-4.1mini2",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.state }}",
+                    "rightValue": "=collecting",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "c50cf6c2-fd1e-4ebf-ac10-48fc6d713b8d"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "collecting"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c7d3bd89-fdd4-4c5b-8f48-287d6dee7dbd",
+                    "leftValue": "={{ $json.state }}",
+                    "rightValue": "quoted",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "quoted"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "e7b798b5-aec3-4e8c-8ada-ca9fde74b2cb",
+                    "leftValue": "={{ $json.state }}",
+                    "rightValue": "confirmed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "confirmed"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "ba8980da-fdce-4ddf-b5ef-6fb605863949",
+                    "leftValue": "={{ $json.state }}",
+                    "rightValue": "awaiting_phone",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "awaiting_phone"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -1472,
+        1344
+      ],
+      "id": "dfb65e0d-777e-406e-b5c2-b7b332d4bd24",
+      "name": "state"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('01_Main').all().last().json.sessionId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        -32,
+        1296
+      ],
+      "id": "a32b92ae-19a9-49b9-ad56-d30cfec9cbe5",
+      "name": "Postgres Chat Memory2",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "postgres": {
+          "id": "vSOjV9WqJViWVGVX",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Usa este agente si se el usuario desea cotizar en otra ubicación.",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "Tu objetivo es solicitar la ubicación para poder realizar la cotización.\n\nReglas:\n- Usa la herramienta \"edit_state\"\n- Solicita al cliente que envíe su ubicación.\n- Sé claro, breve y cordial.\n- No solicites datos adicionales distintos a la ubicación.\n\nEstilo de respuesta:\n- Utiliza un tono profesional y claro.\n- No justifiques la respuesta."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        -64,
+        1488
+      ],
+      "id": "7c635be4-f694-49c7-8f5c-56e62a6daf4c",
+      "name": "new location quotation"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Usa este agente para responder objeciones al precio del servicio.",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "options": {
+          "systemMessage": "Eres un agente especializado en responder objeciones al precio de un servicio de limpieza de pozos y cámaras sépticas.\n\nReglas:\n- Asume que el precio ya fue cotizado previamente.\n- NO modifiques el precio.\n- NO ofrezcas descuentos.\n- NO negocies.\n- NO confirmes contratación.\n- Responde en un tono empático, claro y respetuoso.\n- La respuesta debe ser breve.\n- No inventes características no mencionadas.\n- Explica que el valor fue calculado en base a la distancia que el camión debe recorrer para depositar los residuos en la planta de tratamiento de SAGUAPAC, es por eso el precio.\n- No agregues información adicional.\n- Limítate a traslado y disposición en SAGUAPAC.\n\nNo agregues conclusiones ni calificativos extra."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        224,
+        1488
+      ],
+      "id": "7da46cb8-01b4-4d64-9565-22ebe58ed18e",
+      "name": "price objection agent"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Usa esta herramienta únicamente cuando el mensaje del cliente contenga una ubicación de tipo:\n- https://www.google.com/maps?q=<lat>,<lon>\n- <lat>,<lon>\n\n",
+        "text": "={{ $json.chatInput }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=## Instrucciones\n 1. Usa la herramienta \"save_lat_lon\" para guardar las coordenadas lat,lon.\n 2. Con las coordenadas, usa la herramienta \"obtener_precio\" para el precio y la distancia.\n 3. Con el precio obtenido usa la herramienta \"ajustar_precio\".\n 4. Guarda en el registro con \"guardar_precio_distancia\".\n 5. Si la distancia obtenida es mayor a {{ $('Global Constants').all().last().json.constants.DIST_MAX.toNumber() }}, colocar en el flag \"distancia\".\n 6. Actualiza el estado con la herramienta \"set_state\".\n 7. Prepara la respuesta final concreta, amigable y combinando : \n    a) {{ $('Global Constants').all().last().json.constants.MENSAJE_COTIZACION }}.\n    b) Una invitación a confirmar \"Por favor, confirmenos para programar el servicio\".\n\n## Reglas estrictas\n- Responde **únicamente utilizando herramientas (tools)**.\n- El único campo con texto libre debe ser \"response\"; no agregues texto fuera de ese campo.\n- Incluye en el campo \"response\" el saludo, el mensaje de cotización y la invitación a avanzar.\n- **No repitas ni reformules la ubicación recibida**.\n\nResponde únicamente en formato JSON válido, de acuerdo al siguiente esquema:\n{\n  \"response\": \"<respuesta>\",\n  \"flag\": \"\",\n  \"agente\": \"Pricing Orchestrator\",\n  \"subagente\": \"pricing by location agent\"\n}",
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        336,
+        496
+      ],
+      "id": "38b8af52-58e9-41a8-8a8d-b337bdaa8833",
+      "name": "pricing by location agent",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "toolDescription": "Usa este agente cuando el cliente aclare, corrija o modifique el alcance del servicio. El alcance base es la limpieza de un pozo y/o una cámara de vivienda.\n\nIncluye casos como:\n- Cantidad de pozos, cámaras o ambos.\n- Tipo de cliente o lugar (negocio, barraca, empresa, otros).\n- Uso del pozo (baños, aguas residuales, industriales).\n- Cambios realizados después de haber recibido un precio.",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=## ROL\nEres un agente encargado de validar el alcance del servicio y confirmar que el precio cotizado corresponde según las condiciones indicadas.\n\nTu función es únicamente validar condiciones y confirmar si el precio aplica.  \nNo debes generar una nueva cotización ni explicar reglas internas.\n\n---\n\n## ALCANCE DEL PRECIO\nEl precio cotizado corresponde cuando:\n\n- Es limpieza de pozo, cámara o ambos.  \n- Es vivienda.  \n- Los residuos son exclusivamente sanitarios.  \n\nSi el cliente no menciona el origen de las aguas y menciona que no es vivienda debes solicitar confirmación de que sean aguas sanitarias.\n\n---\n\n## REGLA CLAVE\nLa falta de información **NO** implica que no sea vivienda.\n\nSolo debes activar validaciones adicionales si existe indicio explícito de:\n\n- Uso industrial  \n- Uso comercial  \n- Actividad no residencial  \n\nSi no existe indicio explícito de uso no residencial, asume que corresponde a vivienda estándar y responde normalmente.\n\n---\n\n## CONDICIONES ESPECIALES\nSolo si el usuario indica explícitamente que:\n\n- No es vivienda  \n- Es negocio, empresa, industria o actividad comercial  \n\nDebes:\n\n1. Solicitar información adicional.  \n2. Confirmar que el uso sea exclusivamente sanitario.  \n\n---\n\n## RESTRICCIONES\n\n- No aplica para uso industrial.  \n- No asumas datos adicionales.  \n- No inventes información faltante.  \n- No agregues advertencias innecesarias.  \n- No uses lenguaje jurídico o excesivamente formal.  \n\n---\n\n## ESTILO DE RESPUESTA\n\n- Redacción clara, directa y natural.  \n- Tono comercial, breve y profesional.  \n- Usa primera persona plural.  \n- Evita frases como:  \n  - \"bajo esas condiciones\"  \n  - \"según lo indicado\"  \n  - \"conforme a lo mencionado\"  \n- Cuando corresponda a un solo pozo o cámara aclara que el precio es el mismo.  \n- Si el cliente ya indicó claramente que es limpieza de pozo, cámara o ambos, no vuelvas a preguntar; reconoce la información y continúa.\n- Si el precio ya fue mencionado por el cliente, repítelo textualmente para confirmarlo.  \n\n---\n\n## USO DE HERRAMIENTAS\n\nSi la información es contradictoria o insuficiente para determinar el alcance:\n\n1. Consulta la herramienta \"scope RAG retriever\".\n2. Si aún falta información esencial, responde únicamente con ?\n\nResponde en json estructurado:\n{\n  \"response\": \"<respuesta>\",\n  \"flag\": \"review\"\n}\n\nEl campo \"flag\" debe ser:\n- \"\" (vacío): cuando el alcance corresponde claramente a vivienda estándar con residuos sanitarios.\n- \"review\": cuando exista indicio de uso industrial, comercial, múltiples pozos en negocio, o información contradictoria."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        2112,
+        1920
+      ],
+      "id": "b04f02ae-012a-43e6-b09c-f5fef4f40454",
+      "name": "service scope agent"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Usa este agente cuando la consulta del cliente esté relacionada con información sobre los servicios de limpieza de pozos y cámaras sépticas, incluyendo:\n\n- Consultas técnicas del servicio.\n- Localidades, ciudades o zonas donde se presta el servicio.\n- Tipos de clientes atendidos (viviendas, negocios, barracas, etc.).\n- Disponibilidad y horarios de trabajo\n- Solo pozo o solo cámara.\n- Pozo y cámara.\n- Tipo de cliente o lugar (vivienda, negocio, barraca, empresa).\n- Aclaraciones sobre el uso del pozo (baños, aguas residuales, aguas industriales, etc.).",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=ROL\nEres un agente experto en información de nuestros servicios de limpieza de pozos y cámaras sépticas.\n\n=== REGLA CRÍTICA - EVITAR BUCLE ===\nUsa la herramienta \"info RAG retriever\" UNA sola vez. Con los fragmentos obtenidos, responde INMEDIATAMENTE en formato JSON. No vuelvas a llamar la herramienta. Tras obtener los fragmentos, genera la respuesta final sin más llamadas.\n\nFUENTE DE VERDAD\nLa única fuente válida de información son los fragmentos recuperados por la herramienta \"info RAG retriever\".\nAdemás se aclara que el servicio se lo trata de realizar lo más antes posible una vez que el cliente confirme el servicio.\n\nSELECCIÓN DE FRAGMENTOS\nEvalúa cada fragmento de forma independiente.\nSolo puedes usar fragmentos que respondan de manera clara, directa y explícita a la pregunta del usuario.\nDescarta cualquier fragmento parcial, ambiguo, incompleto o que no responda exactamente a la pregunta.\n\nREGLA PRIORITARIA\nSi la respuesta depende de contar con la ubicación del inmueble (por ejemplo para cotizar, coordinar o verificar disponibilidad), y existe un fragmento que indique que la ubicación es necesaria, debes justificar la necesidad de contar con la ubicación.\nNo puedes confirmar precios ni fechas sin ese requisito si el fragmento lo establece.\n\nRESTRICCIONES\nEstá prohibido usar conocimiento externo, inferencias, suposiciones, razonamiento implícito o completar información faltante.\nNo puedes asumir disponibilidad.\nNo puedes asumir que el servicio puede realizarse en una fecha específica si no está explícitamente indicado en un fragmento válido.\n\nDESCONOCIMIENTO\nSi no existe al menos un fragmento que responda explícitamente la pregunta o respalde la condición necesaria (por ejemplo ubicación obligatoria), coloca en el flag \"manager\".\n\nESTILO\nResponde en primera persona plural.\nLa respuesta debe ser corta, directa y concreta.\nNo uses lenguaje creativo.\nNo agregues explicaciones innecesarias.\nResponde únicamente en formato JSON válido, de acuerdo al siguiente esquema:\n{\n  \"response\": \"<respuesta>\",\n  \"flag\": \"\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        1712,
+        1920
+      ],
+      "id": "10168544-3078-47ec-97b0-42384dc432e8",
+      "name": "service info agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1936,
+        2160
+      ],
+      "id": "d663503c-8067-49f9-a057-72d95a2c2334",
+      "name": "gtp-4.1mini1",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Busca información sobre los servicios de la empresa (limpieza de pozos y cámaras sépticas). Usa esta herramienta cuando el usuario pregunte sobre el servicio, procesos, horarios u otros detalles del negocio.",
+        "workflowId": {
+          "__rl": true,
+          "value": "UCzKpY19hGXSQczZ",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/UCzKpY19hGXSQczZ",
+          "cachedResultName": "RAG"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionId": "={{ $('state').item.json.sessionId }}",
+            "chatInput": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('chatInput', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "chatInput",
+              "displayName": "chatInput",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "metadata",
+              "displayName": "metadata",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        2160
+      ],
+      "id": "2a59ab56-56fe-43a5-ab90-77c8a392e883",
+      "name": "info RAG retriever"
+    },
+    {
+      "parameters": {
+        "description": "Busca información sobre el alcance del servicio",
+        "workflowId": {
+          "__rl": true,
+          "value": "UCzKpY19hGXSQczZ",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/UCzKpY19hGXSQczZ",
+          "cachedResultName": "RAG"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionId": "={{ $('01_Main').item.json.sessionId }}",
+            "chatInput": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('chatInput', ``, 'string') }}",
+            "metadata": "alcance"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "chatInput",
+              "displayName": "chatInput",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "metadata",
+              "displayName": "metadata",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        2320,
+        2160
+      ],
+      "id": "874fc11b-a781-46bc-91ab-f90a64fdff2c",
+      "name": "scope RAG retriever"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "0zB8nzU75uBn6rRp",
+          "mode": "list",
+          "cachedResultName": "pozos_clientes",
+          "cachedResultUrl": "/projects/D5S4DzsCuzzjBHo5/datatables/0zB8nzU75uBn6rRp"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "precio": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('precio', ``, 'number') }}",
+            "fecha_precio": "={{ new Date() }}",
+            "dist_from_scz": "={{ $fromAI('dist_from_scz', ``, 'number').toFixed(2) }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "contacto",
+              "displayName": "contacto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "lat",
+              "displayName": "lat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "fecha_precio",
+              "displayName": "fecha_precio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "dist_from_scz",
+              "displayName": "dist_from_scz",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "lon",
+              "displayName": "lon",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "precio",
+              "displayName": "precio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTableTool",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        704
+      ],
+      "id": "cc530a87-f621-4dba-93fe-e839acd0ae84",
+      "name": "guardar_precio_distancia"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"response\": \"string\",\n  \"flag\": \"string\",\n  \"agente\": \"string\",\n  \"subagente\": \"string\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        560,
+        272
+      ],
+      "id": "77f19552-fe91-450a-a48e-885154a341c7",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fcf99636-dc47-4f77-b99d-7d29aa5f883e",
+              "name": "output",
+              "value": "={{ $json.output.response }}",
+              "type": "string"
+            },
+            {
+              "id": "caefb180-4ff3-47ea-ad20-a249f8aaaf9f",
+              "name": "flag",
+              "value": "={{ $json.output.flag }}",
+              "type": "string"
+            },
+            {
+              "id": "6ff26569-680e-418e-a149-2aee6ffc5c11",
+              "name": "agente",
+              "value": "={{ $json.output.agente }}",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "name": "subagente",
+              "value": "={{ $json.output.subagente || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2640,
+        1440
+      ],
+      "id": "ae80480a-bbba-4f97-b747-a8dea4c41789",
+      "name": "Edit Fields5"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"response\": \"string\",\n  \"flag\": \"string\",\n  \"agente\": \"string\",\n  \"subagente\": \"string\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        720,
+        1328
+      ],
+      "id": "da71cd84-5388-411c-a19a-0c783e535281",
+      "name": "Structured Output Parser2"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Guarda la Información Importante",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mKLOfijuNXAa8MZi",
+          "mode": "list",
+          "cachedResultName": "pozos_state",
+          "cachedResultUrl": "/projects/D5S4DzsCuzzjBHo5/datatables/mKLOfijuNXAa8MZi"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $('state').all(1).last().json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "resumen": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('resumen', `Guarda el resumen`, 'string') }}",
+            "state": "confirmed"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "resumen",
+              "displayName": "resumen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "human_loop",
+              "displayName": "human_loop",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "codigo_whatsapp",
+              "displayName": "codigo_whatsapp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "validating_phone",
+              "displayName": "validating_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "count_messages",
+              "displayName": "count_messages",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTableTool",
+      "typeVersion": 1.1,
+      "position": [
+        768,
+        1760
+      ],
+      "id": "6b42332a-9ec1-411e-bca0-4b5f6c60a78d",
+      "name": "confirmed"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"response\": \"string\",\n  \"flag\": \"string\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2112,
+        2160
+      ],
+      "id": "3e32d1bd-1acb-4254-8493-4af7a6a7d8a0",
+      "name": "Structured Output Parser3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "fab6c58f-bda8-4141-a038-21bcc1ead619",
+              "leftValue": "={{ $json.state }}",
+              "rightValue": "quoted",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "0db405ca-c443-4fae-b127-70d43be6813f",
+              "leftValue": "={{ $json.state }}",
+              "rightValue": "confirmed",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "8985b336-6f91-499d-87b8-a5cee7195203",
+              "leftValue": "={{ $json.state }}",
+              "rightValue": "awaiting_phone",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2464,
+        1360
+      ],
+      "id": "ce4c18e4-bf82-4ccb-a175-0785531837fc",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8b251e24-45ea-42c0-903d-aaa260b6fad0",
+              "name": "sessionId",
+              "value": "={{ $json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "19cc3030-7480-4d1f-a5fe-f7385993f5cf",
+              "name": "chatInput",
+              "value": "={{ $('01_Main').all().last().json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "5d484cae-aca7-4c3c-b468-a6519bfc2a64",
+              "name": "state",
+              "value": "={{ $('If').item.json.state }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "except",
+        "excludeFields": "lat, lon, human_loop, id, createdAt, updatedAt, session_id",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1872,
+        1184
+      ],
+      "id": "3e687e07-21ef-4b1a-845b-5bd1ec27fa0f",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-globals.globalConstants",
+      "typeVersion": 1,
+      "position": [
+        -2800,
+        1360
+      ],
+      "id": "3a0ddc65-4777-4ab8-898e-6b9eb793ad6c",
+      "name": "Global Constants",
+      "credentials": {
+        "globalConstantsApi": {
+          "id": "SfW8BZIsecNwyGbQ",
+          "name": "Global Constants account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Recupera el historial de conversación del usuario",
+        "workflowId": {
+          "__rl": true,
+          "value": "6e8MOq0WC6a2OKQh",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/6e8MOq0WC6a2OKQh",
+          "cachedResultName": "chat_history"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionId": "={{ $('state').item.json.sessionId }}",
+            "chats": 100
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "chats",
+              "displayName": "chats",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        608,
+        1760
+      ],
+      "id": "05af98d9-f231-4330-9dde-29af13bdeb24",
+      "name": "chat_history"
+    },
+    {
+      "parameters": {
+        "hasOutputParser": true,
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=Eres el \"Order Orchestrator\" de una empresa de servicios de limpieza de pozos y cámaras sépticas.\n\nTu función es gestionar mensajes del usuario que expresen intención de confirmar, aceptar o avanzar con el servicio.\n\nReglas:\n- Analiza solo el mensaje actual del usuario.\n- Detecta una única intención explícita.\n- Prioridad de intención:\n  Si un mensaje contiene tanto confirmación del servicio como una consulta de disponibilidad u horario, se debe considerar CONFIRMACIÓN y enrutar al \"confirmation agent\".\n- Si el usuario confirma claramente el servicio, enruta al agente \"confirmation agent\".\n- Si el usuario muestra interés pero NO confirma explícitamente:\n  • Reconoce de forma explícita los servicios ya indicados por el usuario sin volver a consultarlos.\n  • Agrega, de forma alternada (una sí y la siguiente no), al final, en una nueva línea, la solicitud: \"Confírmenos para programar el servicio.\". Nunca repitas esta solicitud en dos respuestas consecutivas.\n- Si el usuario consulta sobre disponibilidad o tiempos de atención:\n   → Indica que procuramos atender el mismo día, previa confirmación y coordinación.\n   → No confirmes horarios específicos ni garantices disponibilidad exacta.\n- Si la respuesta recuperada responde completamente a la pregunta, devuelve solo la frase literal. No expliques, no completes y no reformules.\n- En caso que la pregunta no tenga relación al servicio, responde con \"?\".\n- Considera como CONFIRMACIÓN del servicio tanto:\n  a) Confirmaciones explícitas (\"confirmo\", \"acepto\", \"sí\", \"etc.\")\n  b) Confirmaciones blandas (\"está bien\", \"de acuerdo\", \"dale\", \"etc.\")\n     Nota: un simple \"ok\" sin contexto adicional NO se considera confirmación y debe tratarse como interés sin confirmación.\n- Si se detecta confirmación (explícita o blanda), enruta SIEMPRE al \"confirmation agent\".\n\n{{ $json.precio > 0 ?\n'Gestión de cotizaciones previas:\\n'+\n'- Si el mensaje del usuario solicita precio, valor, cotización o comparte una ubicación se aclara que:\\n'+\n'  Ya se cuenta con la ubicación\\n'+\n'  El servicio ya se cotizo anteriormente en Bs.' + $json.precio\n+ ', el día ' + new Date($json.fecha_precio).toLocaleString(\"es-BO\", { timeZone: \"America/La_Paz\", weekday: \"long\", day: \"2-digit\", month: \"2-digit\", year: \"numeric\", hour: \"2-digit\", minute: \"2-digit\",hour12:false }).replace(\",\", \" -\") +\n'\\n  Se cuenta con la ubicación (dirección).\\n'\n+ '- Solo menciona la fecha de cotización si el usuario pregunta.'\n: \"\" }}\n\nSalida:\n- Si enrutas a un agente, la respuesta final debe ser una copia literal de su output.\n- Está prohibido responder directamente con fechas, días u horarios específicos.\n- Si respondes directamente, no agregues explicaciones ni información adicional.\n- Responde únicamente en formato JSON válido:\n{\n  \"response\": \"<respuesta>\",\n  \"flag\": \"\",\n  \"agente\": \"Order Orchestrator\",\n  \"subagente\": \"<subagente>\"\n}",
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        64,
+        1088
+      ],
+      "id": "43fa56fd-c2d5-42df-90d7-0074cfd89a52",
+      "name": "Order Orchestrator",
+      "alwaysOutputData": false,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "hasOutputParser": true,
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=Eres el Confirmation Orchestrator de la empresa de servicios de limpieza de pozos y cámaras sépticas.\n\nTu función es recopilar los datos finales necesarios para coordinar el servicio antes del traspaso a un operador humano.\n\n=== FASE ACTUAL ===\nYa existe una cotización.\nNO debes recalcular precios.\nNO debes modificar condiciones.\nNO debes negociar.\n\n=== OBJETIVO PRINCIPAL ===\n1. Recopilar nombre del contacto (OPCIONAL, máximo 2 intentos).{{ $json.telefono ? \"\" : \"\\n2. Recopilar teléfono con WhatsApp (OBLIGATORIO).\"}}\n\n=== REGLAS GENERALES ===\n1. Analiza el mensaje actual del usuario.\n2. Detecta intención.\n3. No proporciones fechas ni horarios.\n4. No expliques reglas internas.\n5. Responde SIEMPRE en JSON válido.\n6. Mantén un tono respetuoso y profesional en todo momento. No uses emojis ni emoticonos.\n\nSi el usuario pregunta por disponibilidad, fechas, o cuándo se realizará el servicio:\n- Explica brevemente que, el coordinador lo contactará para coordinar el servicio.\n- No entregues fechas u horarios concretos.\n- Mantén la respuesta junto con cualquier solicitud pendiente (teléfono o nombre) en un solo mensaje JSON.\n\n--------------------------------------------------\nFLUJO PRINCIPAL\n--------------------------------------------------\n\n========================\n1) TELÉFONO (PRIORIDAD MÁXIMA)\n========================\n{{ !$json.telefono ? `\n- Si el mensaje incluye un posible teléfono:\n     → Enviarlo a herramienta \"telefono\" para validarlo.\n     → Si es inválido:\n            → Solicitar nuevamente SOLO el teléfono (sin código de área).\n- Si el mensaje no incluye teléfono:\n     → Solicitarlo obligatoriamente.` : `\n- Tienes el número de teléfono y está validado.` }}\n\n========================\n2) NOMBRE (OPCIONAL)\n========================\n{{ !$json.contacto ? `\n- Utiliza SIEMPRE la herramienta \"validate name\" ante cualquier posible nombre antes de decidir su validez.\n     → Enviarlo inmediatamente a la herramienta \"validate name\" para validar y guardar.\n     → Si el nombre es inválido (bromas, insultos, incoherencias):\n            - Solicitarlo nuevamente de forma amigable.\n            - Máximo 2 intentos (contando el intento actual).\n     → Si el nombre es válido:\n            - No volver a solicitarlo en ningún caso.\n            - Responder que se contactarán del número `+$('Global Constants').all().last().json.constants.TEL_MANAGER+` para coordinar.\n- Si el mensaje no incluye el nombre del usuario:\n     → Solicitar el nombre del cliente de manera amable y amigable (no es necesario nombre completo).\n     → Máximo 2 intentos.\n- Si se alcanzan 2 intentos sin nombre válido, responde: \"Se contactarán del número ` + $('Global Constants').all().last().json.constants.TEL_MANAGER + ` para coordinar la visita.\" y coloca el flag en \"handoff\".\n- Responde unicamente en formato JSON con el siguiente esquema:\n     {\n       \"response\": \"<respuesta>\",\n       \"flag\": \"\",\n       \"agente\": \"Confirmation Orchestrator\",\n       \"subagente\": \"<subagente>\"\n     }` : `\n- El nombre ya está validado.` }}\n\n--------------------------------------------------\nPREGUNTAS TÉCNICAS\n--------------------------------------------------\n\nSi el usuario realiza una pregunta técnica relacionada al servicio:\n→ Enruta al agente \"service scope agent\".\n→ La respuesta final debe ser COPIA EXACTA del output del agente.\n→ No reformular.\n→ No agregar texto adicional.\n→ Formato obligatorio:\n\n{\n  \"response\": \"<respuesta>\",\n  \"flag\": \"\",\n  \"agente\": \"Confirmation Orchestrator\",\n  \"subagente\": \"<subagente>\"\n}\n\n--------------------------------------------------\nMENSAJES NO RELACIONADOS\n--------------------------------------------------\n\nSi el mensaje no tiene relación con el servicio:\n\n{\n  \"response\": \"?\",\n  \"flag\": \"manager\",\n  \"agente\": \"Confirmation Orchestrator\",\n  \"subagente\": \"\"\n}\n\n--------------------------------------------------\nCOTIZACIÓN EXISTENTE\n--------------------------------------------------\n\nEl servicio fue cotizado en Bs.{{ $json.precio }} el {{ new Date($json.fecha_precio).toLocaleString(\"es-BO\", { \n  timeZone: \"America/La_Paz\", \n  weekday: \"long\", \n  day: \"2-digit\", \n  month: \"2-digit\", \n  year: \"numeric\", \n  hour: \"2-digit\", \n  minute: \"2-digit\", \n  hour12:false \n}) }}\n\n--------------------------------------------------\nCONDICIÓN FINAL\n--------------------------------------------------\n\nSi teléfono y nombre están validados:\n→ No solicitar más información.\n→ Indica que lo contactarán para coordinar el servicio del número {{ $('Global Constants').all().last().json.constants.TEL_MANAGER}} y coloca el flag en \"handoff\"",
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        400,
+        2096
+      ],
+      "id": "6697bd0a-02aa-49ca-8c9a-c7788d767cae",
+      "name": "Confirmation Orchestrator",
+      "alwaysOutputData": false,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "o3",
+          "mode": "list",
+          "cachedResultName": "o3"
+        },
+        "responsesApiEnabled": false,
+        "options": {
+          "maxRetries": 2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        16,
+        2320
+      ],
+      "id": "6d9cc4d9-bfde-4c46-9671-63312408385f",
+      "name": "OpenAI o1",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('01_Main').all().last().json.sessionId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        2320
+      ],
+      "id": "58de1166-6e1e-45fa-a4c8-f1fe19848b3c",
+      "name": "Postgres Chat Memory4",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "postgres": {
+          "id": "vSOjV9WqJViWVGVX",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"response\": \"string\",\n  \"flag\": \"string\",\n  \"subagente\": \"string\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        992,
+        2320
+      ],
+      "id": "59624979-ada8-4024-afd7-163e33f706d2",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"response\": \"string\",\n  \"flag\": \"string\",\n  \"agente\": \"string\",\n  \"subagente\": \"string\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        992,
+        1760
+      ],
+      "id": "6f0bca74-6398-47c2-a7eb-8ee2cc82010e",
+      "name": "Structured Output Parser4"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"response\": \"string\",\n  \"flag\": \"string\",\n  \"agente\": \"string\",\n  \"subagente\": \"string\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        944,
+        704
+      ],
+      "id": "5382aef2-f67f-4342-8871-8ddb11f62f0e",
+      "name": "Structured Output Parser5"
+    },
+    {
+      "parameters": {
+        "description": "Herramienta para validar el número de teléfono",
+        "workflowId": {
+          "__rl": true,
+          "value": "jSLKQvpSWRke8A6J",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/jSLKQvpSWRke8A6J",
+          "cachedResultName": "whatsapp-validator"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "telefono": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('telefono', ``, 'string') }}",
+            "session": "={{ $('state').all(2).last().json.sessionId }}"
+          },
+          "matchingColumns": [
+            "telefono"
+          ],
+          "schema": [
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "session",
+              "displayName": "session",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        688,
+        2432
+      ],
+      "id": "f175eba5-c3f5-49fc-9b1d-2304435f3ac7",
+      "name": "telefono"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        416,
+        2608
+      ],
+      "id": "9078ec7d-9b11-4608-a84f-dde74b25fe9f",
+      "name": "gtp-4.1mini3",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "hasOutputParser": true,
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "Eres el \"Pricing Orchestrator\" de una empresa de limpieza de pozos y cámaras sépticas.\n\nTu función es gestionar mensajes del usuario relacionados con cotización, precio o valor del servicio.\n\nReglas de intención:\n- Si el mensaje del usuario solicita precio, valor o cotización, la respuesta debe ser un JSON con:\n  - \"flag\": \"ubicacion\"\n  - \"response\": un texto que cumpla TODAS las siguientes condiciones:\n    1. Solicita que comparta la ubicación necesaria para cotizar. Para ello:\n       • Usa siempre el verbo \"compartir\" (no \"enviar\").\n       • Pide que la comparta \"por este medio\".\n       • Evita cualquier mención a \"mapa\", \"pin\", coordenadas o términos similares.\n    2. Evita repetir la misma frase exacta en interacciones consecutivas; permite ligeras variaciones manteniendo el sentido.\n- Caso contrario identifica la intención y enruta al agente correspondiente.\n- Si la respuesta recuperada responde completamente a la pregunta, devuelve solo la frase literal. No expliques, no completes y no reformules.\n- Si la pregunta no tiene relación con la respuesta, responde con \"?\".\n- No inventes información.\n\nSaludos:\n- SOLO puedes incluir un saludo si el mensaje del usuario contiene explícitamente un saludo.\n- Si el mensaje contiene únicamente un saludo, responde con un saludo breve y cordial seguido de una pregunta abierta que anime al usuario a detallar su necesidad (por ejemplo: \"¿En qué podemos ayudarle?\").\n- Si el mensaje contiene un saludo junto con cualquier otra intención:\n  - Detecta la intención principal.\n  - Si la respuesta es literal, puedes anteponer un saludo breve sin modificar el texto literal.\n- Si el mensaje NO contiene un saludo, está PROHIBIDO incluir un saludo.\n\nReglas de salida:\n- Si enrutas a un agente, la respuesta final debe ser una copia literal del output del agente y SOLO puede incluir saludo si el mensaje original lo contenía.\n- No agregues explicaciones adicionales.\n- Responde únicamente en formato JSON válido, de acuerdo al siguiente esquema:\n{\n  \"response\": \"<respuesta>\",\n  \"flag\": \"\",\n  \"agente\": \"Pricing Orchestrator\",\n  \"subagente\": \"<subagente>\"\n}",
+          "enableStreaming": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        288,
+        32
+      ],
+      "id": "a54c335f-3e33-4a54-a533-8432f48cb7af",
+      "name": "Pricing Orchestrator",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('01_Main').all().last().json.sessionId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        288,
+        272
+      ],
+      "id": "adc65084-15fb-43de-b2c7-8efa5f1db43a",
+      "name": "Postgres Chat Memory1",
+      "credentials": {
+        "postgres": {
+          "id": "vSOjV9WqJViWVGVX",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mKLOfijuNXAa8MZi",
+          "mode": "list",
+          "cachedResultName": "pozos_state",
+          "cachedResultUrl": "/projects/D5S4DzsCuzzjBHo5/datatables/mKLOfijuNXAa8MZi"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $('state').item.json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "state": "quoted"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "resumen",
+              "displayName": "resumen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "human_loop",
+              "displayName": "human_loop",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTableTool",
+      "typeVersion": 1.1,
+      "position": [
+        784,
+        704
+      ],
+      "id": "edaecf94-7970-42cd-80de-87e3c95c848f",
+      "name": "set_state"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "o3",
+          "mode": "list",
+          "cachedResultName": "o3"
+        },
+        "responsesApiEnabled": false,
+        "options": {
+          "maxRetries": 2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -16,
+        3104
+      ],
+      "id": "4ebd134a-d599-4d1d-b339-d9e67c0c183d",
+      "name": "OpenAI o2",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('state').all(3).last().json.sessionId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        288,
+        3104
+      ],
+      "id": "de428a4c-fbf1-46cc-b0b6-3c6b06a7f74a",
+      "name": "Postgres Chat Memory",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "postgres": {
+          "id": "vSOjV9WqJViWVGVX",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"response\": \"string\",\n  \"flag\": \"string\",\n  \"subagente\": \"string\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        880,
+        2992
+      ],
+      "id": "f1c055af-9b61-4b68-9c9d-46f947ad18d5",
+      "name": "Structured Output Parser6"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('state').item.json.chatInput }}",
+        "hasOutputParser": true,
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=Eres el Code Validation Agent de la empresa.\n\nTu función es validar códigos de verificación ingresados por el usuario.\n\n=== REGLAS CRÍTICAS ===\n\n1. Analiza el mensaje del usuario.\n2. Extrae únicamente el posible código numérico.\n3. El código debe cumplir estrictamente:\n   - Exactamente 6 dígitos.\n   - Solo números.\n   - Sin espacios.\n   - Sin letras.\n   - Sin símbolos.\n\n4. Si NO cumple exactamente 6 dígitos numéricos:\n   - NO uses la herramienta.\n   - Responde que el código es inválido por formato.\n\n5. Solo si el código tiene exactamente 6 dígitos numéricos:\n   - Llama a la herramienta \"validate_code_whatsapp\".\n\n6. Si el código ha caducado:\n- Responde únicamente: \"Lo siento, el código proporcionado ha caducado.\"\n- No sugieras ingresar otro código.\n- No ofrezcas reenviar un código.\n- No des instrucciones adicionales.\n\nSolo si el cliente solicita explícitamente un nuevo código, usa la herramienta \"new_code\".\n\n7. Si el cliente desea proporcionar otro número de teléfono:\n{{ (Math.floor((Date.now() - new Date(new Date().setHours($json.codigo_whatsapp.toString().slice(0,2), $json.codigo_whatsapp.toString().slice(2,4), $json.codigo_whatsapp.toString().slice(4,6), 0))) / 60000))<10 ? '- Responde que: \"El sistema solo me permite generar un código cada 20 minutos, por favor solicitame mas tarde\"' : 'Usa la herramienta \"new_phone\" y responde que ingrese un número de teléfono válido' }}\n\n=== FORMATO DE RESPUESTA (OBLIGATORIO JSON) ===\n\nSi el código es válido responde:\n  {\n    \"response\": \"Gracias, se contactarán del número {{ $('Global Constants').all().last().json.constants.TEL_MANAGER}} para coordinar el servicio.\",\n    \"flag\": \"handoff\",\n    \"agente\": \"Awaiting phone Agent\",\n    \"subagente\": \"<subagente responsable>\"\n  }\n\nSi el código es invalido responde:\n  {\n    \"response\": \"<respuesta>\",\n    \"flag\": \"\",\n    \"agente\": \"Awaiting phone Agent\",\n    \"subagente\": \"<subagente responsable>\"\n  }\n\n\n=== RESTRICCIONES ===\n- Nunca inventes resultados.\n- Nunca uses la herramienta si el formato no es exactamente 6 dígitos.\n- Nunca respondas fuera del JSON.\n- No agregues explicaciones adicionales.\n- En \"subagente\" coloca siempre \"Awaiting phone Agent\" (este agente no tiene sub-agentes).",
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        384,
+        2880
+      ],
+      "id": "3642ba6e-0984-4c0e-9bbc-e086c3b3ae98",
+      "name": "Awaiting phone Agent",
+      "alwaysOutputData": false,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mKLOfijuNXAa8MZi",
+          "mode": "list",
+          "cachedResultName": "pozos_state",
+          "cachedResultUrl": "/projects/D5S4DzsCuzzjBHo5/datatables/mKLOfijuNXAa8MZi"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $('state').item.json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "state": "collecting"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "resumen",
+              "displayName": "resumen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "human_loop",
+              "displayName": "human_loop",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "codigo_whatsapp",
+              "displayName": "codigo_whatsapp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTableTool",
+      "typeVersion": 1.1,
+      "position": [
+        -16,
+        1776
+      ],
+      "id": "c6161079-b281-401b-9f5c-b63a8f60327a",
+      "name": "edit_state"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "0zB8nzU75uBn6rRp",
+          "mode": "list",
+          "cachedResultName": "pozos_clientes",
+          "cachedResultUrl": "/projects/D5S4DzsCuzzjBHo5/datatables/0zB8nzU75uBn6rRp"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $('01_Main').all().last().json.sessionId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -2096,
+        1184
+      ],
+      "id": "e9583883-585d-4793-b37e-1d41ebe16039",
+      "name": "Clientes"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n\"output\": {\n  \"response\": \"Algo paso al intentar obtener la ubicación\",\n  \"flag\": \"handoff\"\n}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        736,
+        160
+      ],
+      "id": "0fe42d19-4ca4-410c-b731-70948f197141",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Update row(s) in Data table, para guardar el nombre en el campo contacto",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "0zB8nzU75uBn6rRp",
+          "mode": "list",
+          "cachedResultName": "pozos_clientes",
+          "cachedResultUrl": "/projects/D5S4DzsCuzzjBHo5/datatables/0zB8nzU75uBn6rRp"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $('state').all(2).last().json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "contacto": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('contacto', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "contacto",
+              "displayName": "contacto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "lat",
+              "displayName": "lat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "fecha_precio",
+              "displayName": "fecha_precio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "dist_from_scz",
+              "displayName": "dist_from_scz",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "lon",
+              "displayName": "lon",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "precio",
+              "displayName": "precio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTableTool",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        2608
+      ],
+      "id": "33ef6710-2dd2-4dd2-b10c-1e9c0bdd6ae3",
+      "name": "update_name"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -3184,
+        1168
+      ],
+      "id": "b1421348-1f10-48db-88f1-0f304180436f",
+      "name": "When chat message received",
+      "webhookId": "a95149ac-ec51-4cb2-88c7-9ef248215ba1"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"sessionId\": \"prueba\",\n  \"chatInput\": \"{{ $json.chatInput }}\",\n  \"state\": \"collecting\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2976,
+        1168
+      ],
+      "id": "d3356447-6b4c-4395-9683-4c17980fc0c0",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mKLOfijuNXAa8MZi",
+          "mode": "list",
+          "cachedResultName": "pozos_state",
+          "cachedResultUrl": "/projects/D5S4DzsCuzzjBHo5/datatables/mKLOfijuNXAa8MZi"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        112,
+        2880
+      ],
+      "id": "73a14497-b11f-4bf7-9531-9e9d95efef23",
+      "name": "Get State"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Agente que sirve para validar un nombre",
+        "text": "==== ROL DEL AGENTE ===\nEres un validador semántico especializado en verificar nombres de personas.\n\n=== OBJETIVO ===\nDeterminar si el texto proporcionado \"{{ $fromAI('Prompt__User_Message_', ``, 'string') }}\" por el usuario corresponde a un nombre real de persona.\n\nSi el texto parece ser un nombre pero contiene un posible error de tipeo, debes preguntar al usuario si se refiere al nombre que supones.\n\n=== CRITERIOS DE VALIDACIÓN ===\nUn nombre válido debe:\n\n- Representar una persona real.\n- Tener estructura coherente de nombre propio.\n- Estar compuesto únicamente por letras y espacios.\n- No contener números, emojis o símbolos.\n- No contener insultos, burlas, frases ofensivas o palabras vulgares.\n- No contener frases completas o respuestas evasivas.\n- No representar objetos, empresas, cargos o servicios.\n- No ser texto genérico o sin sentido.\n\n=== DETECCIÓN DE POSIBLES ERRORES DE TIPEO ===\nAntes de considerar el nombre como inválido, evalúa si el texto podría ser un nombre con errores de tipeo.\n\n- Si el texto contiene símbolos o separadores mezclados con letras, intenta inferir el nombre ignorando esos símbolos.\n- Si existen letras repetidas, faltantes o en orden incorrecto que aún permiten inferir un nombre común, considera que puede ser un error de tipeo.\n- Si el texto parece una variación cercana de un nombre conocido, puedes sugerir una corrección.\n\nSolo sugiere una corrección si el error es evidente y la diferencia con un nombre común es mínima.\n\nEn estos casos, infiere el nombre más probable y pide confirmación al usuario antes de validar el nombre.\n\n=== PRIORIDAD DE DECISIÓN ===\nEvalúa el texto en este orden:\n\n1. Primero verifica si parece un nombre con errores de tipeo.\n2. Si es un posible error de tipeo, pregunta confirmación al usuario.\n3. Si no hay errores de tipeo y el nombre cumple los criterios de validación, es válido.\n4. Solo considera el nombre como inválido si no puede interpretarse razonablemente como un nombre de persona.\n\n=== COMPORTAMIENTO CON HERRAMIENTAS ===\n- Si el nombre es válido y no presenta posibles errores de tipeo, debes llamar obligatoriamente a la herramienta `update_name`.\n- Envía el nombre exactamente como fue proporcionado por el usuario.\n- No expliques la validación cuando uses la herramienta.\n- No generes texto adicional fuera del formato requerido.\n- Cuando el nombre sea válido, la respuesta debe ser exclusivamente la llamada a la herramienta.\n\n- Si el texto parece ser un nombre pero contiene un posible error de tipeo:\n  - No uses ninguna herramienta.\n  - Pregunta al usuario si se refiere al nombre que supones.\n\n- Si el nombre es inválido:\n  - No uses ninguna herramienta.\n  - Devuelve una breve explicación del motivo.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        416,
+        2432
+      ],
+      "id": "903ccdb6-78e4-4ca8-914d-5bd24c1fd406",
+      "name": "validate name"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "sessionId"
+            },
+            {
+              "name": "chatInput"
+            },
+            {
+              "name": "state"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -3216,
+        1360
+      ],
+      "id": "f783602d-bd78-4bfe-be8b-a16c9d562477",
+      "name": "01_Main"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "0391b26d-d0cf-465b-855a-9e82f7695ca5",
+              "leftValue": "={{ $json.output.subagente }}",
+              "rightValue": "confirmation agent",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        544,
+        1088
+      ],
+      "id": "d9c449f4-3456-47f5-9870-c574968c7605",
+      "name": "is confirmed?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3b522831-4994-4de4-8cc6-9c8b2da34e49",
+              "name": "precio",
+              "value": "={{ $('Clientes').all().last().json.precio }}",
+              "type": "string"
+            },
+            {
+              "id": "c37031cd-fa4a-47ea-9aac-37619e9a6e82",
+              "name": "session_id",
+              "value": "={{ $('Clientes').all().last().json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ad3f675b-ed69-4a0b-bdbb-8d00fcc9e4a2",
+              "name": "fecha_precio",
+              "value": "={{ $('Clientes').all().last().json.fecha_precio }}",
+              "type": "string"
+            },
+            {
+              "id": "2591d569-99ca-4953-9440-096c77cccd5c",
+              "name": "dist_from_scz",
+              "value": "={{ $('Clientes').all().last().json.dist_from_scz }}",
+              "type": "number"
+            },
+            {
+              "id": "d9d0c1a3-6a4a-4d08-af9d-1d3a7f0f5164",
+              "name": "telefono",
+              "value": "={{ $('Clientes').all().last().json.telefono }}",
+              "type": "string"
+            },
+            {
+              "id": "f387ba82-e853-4bbb-abc4-ebc22ce747ce",
+              "name": "contacto",
+              "value": "={{ $('Clientes').all().last().json.contacto }}",
+              "type": "string"
+            },
+            {
+              "id": "3708b9b5-5358-4140-b844-995ec96044e8",
+              "name": "chatInput",
+              "value": "={{ $('01_Main').all().last().json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "b1f79273-4ff0-4a93-bc09-74017d7649f1",
+              "name": "state",
+              "value": "confirmed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        704,
+        864
+      ],
+      "id": "ae49c4d1-0675-44fd-b13d-4fbdaac2913e",
+      "name": "derivar"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('01_Main').all().last().json.sessionId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        368,
+        1776
+      ],
+      "id": "d6c1138e-f618-4da3-b798-6f3b0ff1cb6e",
+      "name": "Postgres Chat Memory3",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "postgres": {
+          "id": "vSOjV9WqJViWVGVX",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Usa este agente cuanto el servicio sea confirmado.",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=Sigue estrictamente las siguientes instrucciones, en orden:\n\n1. Usa la herramienta \"chat_history\" para revisar el historial completo de la conversación.\n\n2. Del historial obtenido, identifica ÚNICAMENTE la información que se considere “Información importante” solo si aparece claramente alguno de los siguientes puntos:\n   - Tipo de cliente distinto a vivienda.\n   - Más de un pozo o más de una cámara.\n   - Si son varias viviendas.\n   - Existencia de un contacto para el servicio.\n   No infieras, no asumas y no completes información faltante.\n\n3. Usa la herramienta \"confirmed\" para guardar la \"Información importante\" (el resumen). Si no existe \"Información importante\" guarda \"Sin información importante\".\n\n4. Responde: \"le programaremos\"\n\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        512,
+        1488
+      ],
+      "id": "c8e00225-b0cc-4c6e-98ee-c8bfebcc348f",
+      "name": "confirmation agent"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mKLOfijuNXAa8MZi",
+          "mode": "list",
+          "cachedResultName": "pozos_state",
+          "cachedResultUrl": "/projects/D5S4DzsCuzzjBHo5/datatables/mKLOfijuNXAa8MZi"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $('Get State').item.json.session_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{ $('Get State').item.json.session_id }}",
+            "state": "confirmed",
+            "validating_phone": "={{ \"\" }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "resumen",
+              "displayName": "resumen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "human_loop",
+              "displayName": "human_loop",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "codigo_whatsapp",
+              "displayName": "codigo_whatsapp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "validating_phone",
+              "displayName": "validating_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTableTool",
+      "typeVersion": 1.1,
+      "position": [
+        512,
+        3104
+      ],
+      "id": "682aa1f1-02ae-449f-b495-3e309bb697fb",
+      "name": "new phone"
+    },
+    {
+      "parameters": {
+        "description": "Genera y envía un nuevo código de verificación por WhatsApp",
+        "workflowId": {
+          "__rl": true,
+          "value": "jSLKQvpSWRke8A6J",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/jSLKQvpSWRke8A6J",
+          "cachedResultName": "whatsapp-validator"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "telefono": "={{ $('Get State').item.json.validating_phone }}",
+            "session": "={{ $('state').all(3).last().json.sessionId }}"
+          },
+          "matchingColumns": [
+            "telefono"
+          ],
+          "schema": [
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "session",
+              "displayName": "session",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        608,
+        3104
+      ],
+      "id": "d9d5ed96-a679-49cb-a602-e8a1ee986572",
+      "name": "new code"
+    },
+    {
+      "parameters": {
+        "description": "Valida el código de verificación enviado por WhatsApp",
+        "workflowId": {
+          "__rl": true,
+          "value": "RDbBZQBKQhZN6Z53",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/RDbBZQBKQhZN6Z53",
+          "cachedResultName": "Validate-code-whatsapp"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session": "={{ $('state').all(3).last().json.sessionId }}",
+            "code": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('code', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session",
+              "displayName": "session",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "code",
+              "displayName": "code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        3104
+      ],
+      "id": "c90064f4-027d-453b-947e-93ee40954705",
+      "name": "validate code whatsapp"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "id"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        128,
+        288
+      ],
+      "id": "d790f79d-10f1-40ec-b92e-889950722f5e",
+      "name": "gpt-5-mini",
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -176,
+        1296
+      ],
+      "id": "067b4416-0444-45f1-ab77-0f78307de319",
+      "name": "gpt-5-mini1",
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        128,
+        2320
+      ],
+      "id": "309ab813-cfbb-491b-80ad-08d752fe7cd6",
+      "name": "gpt-5-mini2",
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        128,
+        3104
+      ],
+      "id": "eff00913-b358-4e7d-9a41-304a95a7c799",
+      "name": "gpt-5-mini3",
+      "credentials": {
+        "openAiApi": {
+          "id": "NCFd3r9qAKJ9J6Gt",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "acdccb78-67b9-401a-b5a2-6964ee6bd989",
+              "leftValue": "={{ $json.output.flag }}",
+              "rightValue": "handoff",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        752,
+        2096
+      ],
+      "id": "b647203d-cb9c-49a9-adec-20e730748929",
+      "name": "handoff"
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "useDataOfInput": 2
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1264,
+        1888
+      ],
+      "id": "815eb8c9-884d-4efb-9f46-2f4c2224deee",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mKLOfijuNXAa8MZi",
+          "mode": "list",
+          "cachedResultName": "pozos_state",
+          "cachedResultUrl": "/projects/D5S4DzsCuzzjBHo5/datatables/mKLOfijuNXAa8MZi"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $('state').last().json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "state": "handoff"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "resumen",
+              "displayName": "resumen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "human_loop",
+              "displayName": "human_loop",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "codigo_whatsapp",
+              "displayName": "codigo_whatsapp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "validating_phone",
+              "displayName": "validating_phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "count_messages",
+              "displayName": "count_messages",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        912,
+        1952
+      ],
+      "id": "8107add4-0bcc-450f-a443-cecc11b742a3",
+      "name": "state handoff"
+    }
+  ],
+  "pinData": {
+    "01_Main": [
+      {
+        "json": {
+          "sessionId": "59169212717",
+          "chatInput": "Arminda Mendoza",
+          "state": "confirmed"
+        },
+        "binary": {},
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "OpenAI o3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Pricing Orchestrator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save_lat_lon": {
+      "ai_tool": [
+        [
+          {
+            "node": "pricing by location agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "obtener_precio": {
+      "ai_tool": [
+        [
+          {
+            "node": "pricing by location agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ajustar_precio": {
+      "ai_tool": [
+        [
+          {
+            "node": "pricing by location agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gtp-4.1mini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "pricing by location agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI o": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Order Orchestrator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gtp-4.1mini2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "confirmation agent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "price objection agent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "new location quotation",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "state": {
+      "main": [
+        [
+          {
+            "node": "Pricing Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Order Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Confirmation Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory2": {
+      "ai_memory": [
+        [
+          {
+            "node": "Order Orchestrator",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "new location quotation": {
+      "ai_tool": [
+        [
+          {
+            "node": "Order Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "price objection agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Order Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "pricing by location agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Pricing Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "service scope agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Order Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Confirmation Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Pricing Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "service info agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Order Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Pricing Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gtp-4.1mini1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "service scope agent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "service info agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "info RAG retriever": {
+      "ai_tool": [
+        [
+          {
+            "node": "service info agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "scope RAG retriever": {
+      "ai_tool": [
+        [
+          {
+            "node": "service scope agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "guardar_precio_distancia": {
+      "ai_tool": [
+        [
+          {
+            "node": "pricing by location agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Pricing Orchestrator",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser2": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Order Orchestrator",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "confirmed": {
+      "ai_tool": [
+        [
+          {
+            "node": "confirmation agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser3": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "service scope agent",
+            "type": "ai_outputParser",
+            "index": 0
+          },
+          {
+            "node": "service info agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Clientes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Global Constants": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chat_history": {
+      "ai_tool": [
+        [
+          {
+            "node": "confirmation agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order Orchestrator": {
+      "main": [
+        [
+          {
+            "node": "is confirmed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI o1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Confirmation Orchestrator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory4": {
+      "ai_memory": [
+        [
+          {
+            "node": "Confirmation Orchestrator",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Confirmation Orchestrator",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser4": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "confirmation agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser5": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "pricing by location agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "telefono": {
+      "ai_tool": [
+        [
+          {
+            "node": "Confirmation Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmation Orchestrator": {
+      "main": [
+        [
+          {
+            "node": "handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gtp-4.1mini3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "validate name",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pricing Orchestrator": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "Pricing Orchestrator",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_state": {
+      "ai_tool": [
+        [
+          {
+            "node": "pricing by location agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI o2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Awaiting phone Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Awaiting phone Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser6": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Awaiting phone Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "edit_state": {
+      "ai_tool": [
+        [
+          {
+            "node": "new location quotation",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Awaiting phone Agent": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clientes": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_name": {
+      "ai_tool": [
+        [
+          {
+            "node": "validate name",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Global Constants",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get State": {
+      "main": [
+        [
+          {
+            "node": "Awaiting phone Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate name": {
+      "ai_tool": [
+        [
+          {
+            "node": "Confirmation Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "01_Main": {
+      "main": [
+        [
+          {
+            "node": "Global Constants",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "is confirmed?": {
+      "main": [
+        [
+          {
+            "node": "derivar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "derivar": {
+      "main": [
+        [
+          {
+            "node": "state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory3": {
+      "ai_memory": [
+        [
+          {
+            "node": "price objection agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "confirmation agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Order Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "new phone": {
+      "ai_tool": [
+        [
+          {
+            "node": "Awaiting phone Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "new code": {
+      "ai_tool": [
+        [
+          {
+            "node": "Awaiting phone Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate code whatsapp": {
+      "ai_tool": [
+        [
+          {
+            "node": "Awaiting phone Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gpt-5-mini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Pricing Orchestrator",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "gpt-5-mini1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Order Orchestrator",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "gpt-5-mini2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Confirmation Orchestrator",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "gpt-5-mini3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Awaiting phone Agent",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "handoff": {
+      "main": [
+        [
+          {
+            "node": "state handoff",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "state handoff": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "versionId": "6a50f49b-369c-4e9c-a688-b85ac29340b4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d9c5adb5b47dc1dff2717f3c50997b1de6d705b83f6fc3647d372ee5b662ea9d"
+  },
+  "id": "wY2zlf23Ju6Yiiib",
+  "tags": []
+}

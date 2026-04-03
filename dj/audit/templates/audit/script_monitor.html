@@ -1,0 +1,119 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Monitor: {{ script_name }} | n8n Manager{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+            <h2 class="text-lg font-semibold">
+                <span class="font-mono text-primary">{{ script_name }}.py</span>
+            </h2>
+            <!-- Status -->
+            <span id="statusRunning" class="flex items-center gap-1 text-sm">
+                <span class="loading loading-spinner loading-xs text-primary"></span>
+                <span class="opacity-70">Ejecutando…</span>
+            </span>
+            <span id="statusOk" class="badge badge-success hidden">Completado</span>
+            <span id="statusErr" class="badge badge-error hidden">Error / Cancelado</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span id="elapsedWrap" class="text-xs opacity-50 font-mono" title="Tiempo transcurrido">
+                <span id="elapsed">0s</span>
+            </span>
+            <button id="btnCancel" class="btn btn-sm btn-error">
+                Cancelar
+            </button>
+            <a href="{% url 'audit_index' %}" class="btn btn-sm btn-ghost">← Volver</a>
+        </div>
+    </div>
+
+    <!-- Terminal output -->
+    <div class="bg-[#1e1e1e] rounded-lg border border-base-300 overflow-hidden shadow-lg">
+        <div class="flex items-center gap-2 px-4 py-2 bg-[#2d2d30] border-b border-[#444] text-xs text-gray-400 font-mono">
+            <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+            <span class="w-3 h-3 rounded-full bg-yellow-500 inline-block"></span>
+            <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+            <span class="ml-2 opacity-60">terminal</span>
+        </div>
+        <pre
+            id="output"
+            class="p-4 text-sm text-green-300 font-mono whitespace-pre-wrap overflow-y-auto"
+            style="min-height: 400px; max-height: 70vh;"
+        ></pre>
+    </div>
+</div>
+
+<script>
+(function() {
+    const JOB_ID = '{{ job_id }}';
+    const outputEl = document.getElementById('output');
+    const btnCancel = document.getElementById('btnCancel');
+    const elapsedEl = document.getElementById('elapsed');
+    const elapsedWrap = document.getElementById('elapsedWrap');
+    const statusRunning = document.getElementById('statusRunning');
+    const statusOk = document.getElementById('statusOk');
+    const statusErr = document.getElementById('statusErr');
+
+    let pollTimer = null;
+    let startTime = Date.now();
+    let elapsedTimer = null;
+    let finished = false;
+
+    // Elapsed timer
+    elapsedTimer = setInterval(() => {
+        const s = Math.floor((Date.now() - startTime) / 1000);
+        elapsedEl.textContent = s < 60 ? s + 's' : Math.floor(s/60) + 'm ' + (s%60) + 's';
+    }, 1000);
+
+    function setFinished(ok) {
+        finished = true;
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        if (elapsedTimer) { clearInterval(elapsedTimer); }
+        statusRunning.classList.add('hidden');
+        btnCancel.classList.add('hidden');
+        if (ok) {
+            statusOk.classList.remove('hidden');
+        } else {
+            statusErr.classList.remove('hidden');
+        }
+        document.title = (ok ? '✓' : '✗') + ' Monitor | n8n Manager';
+    }
+
+    function poll() {
+        fetch('/audit/script-output/' + JOB_ID + '/')
+            .then(r => r.json())
+            .then(data => {
+                outputEl.textContent = data.output || '';
+                outputEl.scrollTop = outputEl.scrollHeight;
+                if (!data.running) {
+                    setFinished(data.ok);
+                }
+            })
+            .catch(() => {});
+    }
+
+    pollTimer = setInterval(poll, 500);
+    poll(); // primera llamada inmediata
+
+    // Cancel
+    btnCancel.addEventListener('click', () => {
+        if (finished) return;
+        if (!confirm('¿Cancelar el script en ejecución?')) return;
+        const csrf = document.cookie.split('; ').find(r => r.startsWith('csrftoken='));
+        const csrfToken = csrf ? csrf.split('=')[1] : '';
+        fetch('/audit/script-cancel/' + JOB_ID + '/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken }
+        }).then(r => r.json()).then(data => {
+            if (data.ok) {
+                outputEl.textContent += '\n[Cancelado]\n';
+                outputEl.scrollTop = outputEl.scrollHeight;
+                setFinished(false);
+            }
+        }).catch(() => {});
+    });
+})();
+</script>
+{% endblock %}

@@ -1,7 +1,4 @@
-volumes:
-  n8n_storage:
-  postgres_storage:  # Mapeado a n8n_postgres_storage (volumen antiguo con workflows)
-  # chroma_storage:  # Ahora usando bind mount ./chroma_storage
+volumes: {}
 
 networks:
   pozos:
@@ -15,14 +12,12 @@ services:
     hostname: postgres
     networks: ['pozos']
     restart: unless-stopped
-    ports:
-      - "5433:5432"  # Puerto externo 5433 para evitar conflictos
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-magoreal}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       POSTGRES_DB: ${POSTGRES_DB:-pozos}
     volumes:
-      - postgres_storage:/var/lib/postgresql/data
+      - ../postgres_storage:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -36,7 +31,7 @@ services:
     networks: ['pozos']
     restart: unless-stopped
     ports:
-      - "5679:5678"
+      - "127.0.0.1:${N8N_PORT:-5679}:5678"
     environment:
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: postgres
@@ -51,17 +46,18 @@ services:
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
       N8N_USER_MANAGEMENT_JWT_SECRET: ${N8N_USER_MANAGEMENT_JWT_SECRET}
 
-      N8N_HOST: ${N8N_HOST}
+      N8N_HOST: ${DOMAIN}
       N8N_PROTOCOL: https
-      WEBHOOK_URL: https://${N8N_HOST}
+      WEBHOOK_URL: https://${DOMAIN}
 
       N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE: "true"
+      N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE:-true}
 
       NODE_ENV: production
       TZ: America/La_Paz
 
     volumes:
-      - n8n_storage:/home/node/.n8n
+      - ../n8n_storage:/home/node/.n8n
       - ../shared:/data/shared
     depends_on:
       postgres:
@@ -84,7 +80,7 @@ services:
       ANONYMIZED_TELEMETRY: "FALSE"
       TZ: America/La_Paz
     volumes:
-      - ./chroma_storage:/data  # Directorio relativo a deploy/
+      - ../chroma_storage:/data  # Directorio en la raíz del repo
 
   gradio:
     build:
@@ -95,13 +91,14 @@ services:
     networks: ['pozos']
     restart: unless-stopped
     ports:
-      - "7860:7860"
+      - "127.0.0.1:${GRADIO_PORT:-7860}:7860"
     environment:
       CHROMA_HOST: ${CHROMA_HOST:-chroma}
       CHROMA_PORT: ${CHROMA_PORT:-8000}
       CHROMA_COLLECTION: ${CHROMA_COLLECTION:-pozos}
       GRADIO_AUTH_USERNAME: ${GRADIO_AUTH_USERNAME:-admin}
       GRADIO_AUTH_PASSWORD: ${GRADIO_AUTH_PASSWORD:-admin123}
+      GRADIO_ROOT_PATH: ${GRADIO_ROOT_PATH:-/gradio}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-large}
       ENV: ${ENV:-production}
@@ -125,10 +122,11 @@ services:
     networks: ['pozos']
     restart: unless-stopped
     ports:
-      - "8009:8009"
+      - "127.0.0.1:${API_PORT:-8009}:8009"
     environment:
       API_HOST: ${API_HOST:-0.0.0.0}
       API_PORT: ${API_PORT:-8009}
+      API_ROOT_PATH: ${API_ROOT_PATH:-/api}
       ENV: ${ENV:-production}
       DEBUG: ${DEBUG:-false}
       # Configuración para conectarse a otros servicios
@@ -157,13 +155,50 @@ services:
     environment:
       N8N_API_URL: http://n8n:5678
       N8N_API_KEY: ${N8N_API_KEY}
-      N8N_MODE: "true"
       MCP_MODE: http
       USE_FIXED_HTTP: "true"
       AUTH_TOKEN: ${MCP_AUTH_TOKEN}
       N8N_MCP_TELEMETRY_DISABLED: "true"
     ports:
-      - "3001:3000"
+      - "127.0.0.1:${MCP_PORT:-3001}:3000"
     depends_on:
       n8n:
         condition: service_healthy
+
+  django:
+    build:
+      context: ..
+      dockerfile: docker/django/Dockerfile
+    container_name: n8npozos-django
+    hostname: django
+    networks: ['pozos']
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${DJANGO_PORT:-8010}:8000"
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DEBUG: "False"
+      ALLOWED_HOSTS: ${DOMAIN},localhost,127.0.0.1
+      CSRF_TRUSTED_ORIGINS: https://${DOMAIN}
+      DJANGO_DB: ${DJANGO_DB:-n8n_django}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      N8N_API_KEY: ${N8N_API_KEY}
+      N8N_URL: https://${DOMAIN}
+      N8N_WEBHOOK_UPDATE_AUDIT_PROMPT: ${N8N_WEBHOOK_UPDATE_AUDIT_PROMPT:-}
+      N8N_WORKFLOW_PROMPT_ID: ${N8N_WORKFLOW_PROMPT_ID:-}
+      N8N_NODE_NAME_PROMPT: ${N8N_NODE_NAME_PROMPT:-}
+      N8N_WEBHOOK_UPDATE_PROMPT_NODE: ${N8N_WEBHOOK_UPDATE_PROMPT_NODE:-}
+      TZ: America/La_Paz
+    volumes:
+      - ../chats:/app/chats
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/admin/login/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5

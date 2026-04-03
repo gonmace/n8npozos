@@ -1,0 +1,240 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Enviar Mensajes — {{ archivo }} | n8n Manager{% endblock %}
+
+{% block content %}
+<div style="height:calc(100vh - 7rem)" class="flex flex-col gap-3">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <h2 class="text-base font-semibold">
+                Enviar desde <span class="font-mono text-primary">{{ archivo }}</span>
+            </h2>
+            <span id="statusRunning" class="hidden items-center gap-1 text-sm" style="display:none">
+                <span class="loading loading-spinner loading-xs text-primary"></span>
+                <span class="opacity-70">Ejecutando…</span>
+            </span>
+            <span id="statusOk" class="hidden badge badge-success">Completado</span>
+            <span id="statusErr" class="hidden badge badge-error">Error / Cancelado</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span id="elapsedWrap" class="hidden text-xs font-mono opacity-50">
+                <span id="elapsed">0s</span>
+            </span>
+            <button id="btnCancel" class="btn btn-sm btn-error" disabled>Cancelar</button>
+            <button onclick="window.close()" class="btn btn-sm btn-ghost">✕ Cerrar</button>
+        </div>
+    </div>
+
+    <!-- Two-panel layout -->
+    <div class="flex gap-4 flex-1 min-h-0">
+
+        <!-- LEFT: consultas list -->
+        <div class="w-72 flex flex-col gap-2 border-r border-base-300 pr-4">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold uppercase opacity-60">Consultas</span>
+                <div class="flex gap-1">
+                    <button onclick="selAll(true)" class="btn btn-xs btn-ghost">Todos</button>
+                    <button onclick="selAll(false)" class="btn btn-xs btn-ghost">Ninguno</button>
+                </div>
+            </div>
+
+            <div id="contactsList" class="flex-1 overflow-y-auto space-y-1 pr-1">
+                <div class="text-xs opacity-50 text-center py-6">Cargando…</div>
+            </div>
+
+            <div class="pt-2 border-t border-base-300 space-y-2">
+                {% if prueba %}
+                <div class="badge badge-warning badge-sm w-full justify-center">Modo prueba activo</div>
+                {% endif %}
+                <div class="text-xs opacity-50 text-center">
+                    <span id="selCount">0</span> de <span id="totCount">0</span> seleccionadas
+                </div>
+                <button id="btnRun" onclick="runSelected()"
+                    class="btn btn-primary btn-sm w-full" disabled>
+                    Ejecutar seleccionadas
+                </button>
+            </div>
+        </div>
+
+        <!-- RIGHT: terminal -->
+        <div class="flex-1 flex flex-col min-w-0">
+            <div class="bg-[#1e1e1e] rounded-lg border border-base-300 overflow-hidden shadow-lg flex-1 flex flex-col">
+                <div class="flex items-center gap-2 px-4 py-2 bg-[#2d2d30] border-b border-[#444] text-xs text-gray-400 font-mono shrink-0">
+                    <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+                    <span class="w-3 h-3 rounded-full bg-yellow-500 inline-block"></span>
+                    <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+                    <span class="ml-2 opacity-60">terminal</span>
+                </div>
+                <pre id="output"
+                    class="flex-1 p-4 text-sm text-green-300 font-mono whitespace-pre-wrap overflow-y-auto"
+                    style="min-height:0"
+                ><span class="opacity-40">Selecciona las consultas y haz clic en "Ejecutar seleccionadas"…</span></pre>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+(function () {
+    const ARCHIVO  = '{{ archivo|escapejs }}';
+    const PRUEBA   = '{{ prueba }}' === '1';
+    const URL_P    = '{{ url|escapejs }}';
+    const TIMEOUT  = parseInt('{{ timeout|escapejs }}') || 120;
+
+    let groups = [];      // [{phone, indices:[…], msgs:[{msg,delay}]}]
+    let checked = new Set();
+    let running = false;
+    let jobId = null;
+    let pollTimer = null;
+    let elapsedTimer = null;
+
+    const listEl    = document.getElementById('contactsList');
+    const outputEl  = document.getElementById('output');
+    const btnRun    = document.getElementById('btnRun');
+    const btnCancel = document.getElementById('btnCancel');
+    const selCountEl  = document.getElementById('selCount');
+    const totCountEl  = document.getElementById('totCount');
+    const stRunning = document.getElementById('statusRunning');
+    const stOk      = document.getElementById('statusOk');
+    const stErr     = document.getElementById('statusErr');
+    const elapsedWrap = document.getElementById('elapsedWrap');
+    const elapsedEl   = document.getElementById('elapsed');
+
+    // ── Load JSON items ──────────────────────────────────────────────────────
+    fetch('/audit/preview-json/?archivo=' + encodeURIComponent(ARCHIVO))
+        .then(r => r.json())
+        .then(d => {
+            if (!d.ok) { listEl.innerHTML = err(d.error); return; }
+            buildGroups(d.items);
+            render();
+        })
+        .catch(() => { listEl.innerHTML = err('Error de red'); });
+
+    function buildGroups(items) {
+        // Each item is its own entry (no grouping by phone)
+        groups = items.map((item, idx) => ({
+            idx,
+            phone: item.telefono || '(sin teléfono)',
+            msg: item.mensaje || '',
+        }));
+        groups.forEach((_, gi) => checked.add(gi));   // all checked by default
+        totCountEl.textContent = groups.length;
+    }
+
+    function render() {
+        listEl.innerHTML = '';
+        groups.forEach((g, gi) => {
+            const on = checked.has(gi);
+            const wrap = document.createElement('label');
+            wrap.className = 'flex gap-2 p-2 rounded-lg cursor-pointer border transition-colors ' +
+                (on ? 'border-primary bg-base-200' : 'border-base-300 bg-base-100 opacity-60');
+            wrap.innerHTML =
+                `<input type="checkbox" class="checkbox checkbox-xs checkbox-primary mt-0.5 shrink-0"
+                    ${on ? 'checked' : ''} data-gi="${gi}">` +
+                `<div class="min-w-0">` +
+                    `<div class="text-xs font-mono opacity-50 truncate">${esc(g.phone)}</div>` +
+                    `<div class="text-xs truncate mt-0.5">${esc(g.msg)}</div>` +
+                `</div>`;
+            wrap.querySelector('input').addEventListener('change', e => {
+                const gi2 = parseInt(e.target.dataset.gi);
+                if (e.target.checked) checked.add(gi2); else checked.delete(gi2);
+                render();
+            });
+            listEl.appendChild(wrap);
+        });
+        selCountEl.textContent = checked.size;
+        btnRun.disabled = checked.size === 0 || running;
+    }
+
+    window.selAll = function (val) {
+        if (val) groups.forEach((_, gi) => checked.add(gi)); else checked.clear();
+        render();
+    };
+
+    // ── Run selected ─────────────────────────────────────────────────────────
+    window.runSelected = async function () {
+        if (running || checked.size === 0) return;
+
+        // Collect original indices in order
+        const idxs = [];
+        groups.forEach((g, gi) => { if (checked.has(gi)) idxs.push(g.idx); });
+        idxs.sort((a, b) => a - b);
+
+        running = true;
+        btnRun.disabled = true;
+        outputEl.textContent = '';
+        stRunning.style.display = 'flex';
+        stOk.classList.add('hidden');
+        stErr.classList.add('hidden');
+        btnCancel.disabled = false;
+        elapsedWrap.classList.remove('hidden');
+
+        const t0 = Date.now();
+        elapsedTimer = setInterval(() => {
+            const s = Math.floor((Date.now() - t0) / 1000);
+            elapsedEl.textContent = s < 60 ? s + 's' : Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+        }, 1000);
+
+        const csrf = (document.cookie.split('; ').find(r => r.startsWith('csrftoken=')) || '').split('=')[1] || '';
+
+        try {
+            const res = await fetch('/audit/run-selected/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                body: JSON.stringify({ archivo: ARCHIVO, selected_indices: idxs, prueba: PRUEBA, url: URL_P, timeout: TIMEOUT })
+            });
+            const data = await res.json();
+            if (!data.ok || !data.job_id) { done(false); outputEl.textContent = data.error || 'Error al iniciar'; return; }
+            jobId = data.job_id;
+            pollTimer = setInterval(poll, 500);
+            poll();
+        } catch (e) {
+            done(false);
+            outputEl.textContent = 'Error de conexión: ' + e.message;
+        }
+    };
+
+    function poll() {
+        fetch('/audit/script-output/' + jobId + '/')
+            .then(r => r.json())
+            .then(d => {
+                outputEl.textContent = d.output || '';
+                outputEl.scrollTop = outputEl.scrollHeight;
+                if (!d.running) done(d.ok);
+            })
+            .catch(() => {});
+    }
+
+    function done(ok) {
+        running = false;
+        if (pollTimer)   { clearInterval(pollTimer);   pollTimer = null; }
+        if (elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer = null; }
+        stRunning.style.display = 'none';
+        btnCancel.disabled = true;
+        btnRun.disabled = false;
+        (ok ? stOk : stErr).classList.remove('hidden');
+        document.title = (ok ? '✓' : '✗') + ' Envío | n8n Manager';
+    }
+
+    btnCancel.addEventListener('click', () => {
+        if (!running || !jobId) return;
+        if (!confirm('¿Cancelar el envío en progreso?')) return;
+        const csrf = (document.cookie.split('; ').find(r => r.startsWith('csrftoken=')) || '').split('=')[1] || '';
+        fetch('/audit/script-cancel/' + jobId + '/', { method: 'POST', headers: { 'X-CSRFToken': csrf } })
+            .then(r => r.json())
+            .then(d => { if (d.ok) { outputEl.textContent += '\n[Cancelado]\n'; outputEl.scrollTop = outputEl.scrollHeight; done(false); } })
+            .catch(() => {});
+    });
+
+    function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function err(msg) {
+        return '<div class="text-error text-xs p-2">' + esc(msg || 'Error') + '</div>';
+    }
+})();
+</script>
+{% endblock %}

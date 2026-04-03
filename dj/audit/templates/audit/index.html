@@ -1,0 +1,761 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Auditoría | n8n Manager{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/diff@5.2.0/dist/diff.min.js"></script>
+<script type="application/json" id="audit-all-ids">{{ record_ids_json|safe }}</script>
+<style>
+#auditTable .audit-col-checkbox { width: 1px !important; white-space: nowrap !important; padding-left: 0.25rem !important; padding-right: 0.25rem !important; }
+/* Fila de detalle: contenido ocupa todo el ancho de la tabla con position:absolute */
+#auditTable .audit-diff-row-wrapper { position: relative !important; }
+#auditTable .audit-diff-row .audit-diff-spacer { min-height: 400px; }
+#auditTable .audit-diff-row .audit-diff-content {
+  position: absolute !important; left: 0 !important; right: 0 !important; top: 0 !important;
+  z-index: 1; min-height: 400px;
+}
+#auditTable .audit-diff-row td.hidden { width: 0 !important; min-width: 0 !important; padding: 0 !important; border: none !important; overflow: hidden !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stats cards -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8" id="audit-stats-cards">
+    <div class="audit-filter-card bg-base-100 shadow-md rounded-lg px-4 py-5 text-center cursor-pointer hover:ring-2 hover:ring-primary hover:ring-offset-2 transition-all select-none" data-filter="all" title="Clic para ver todos">
+        <dt class="text-xs font-semibold text-base-content opacity-60 uppercase tracking-wider">Total</dt>
+        <dd class="mt-1 text-3xl font-semibold text-primary">{{ stats.total }}</dd>
+    </div>
+    <div class="bg-base-100 shadow-md rounded-lg px-4 py-5 text-center">
+        <dt class="text-xs font-semibold text-base-content opacity-60 uppercase tracking-wider">Score Prom.</dt>
+        <dd class="mt-1 text-3xl font-semibold text-secondary">{{ stats.avg_score }}</dd>
+    </div>
+    <div class="audit-filter-card bg-base-100 shadow-md rounded-lg px-4 py-5 text-center cursor-pointer hover:ring-2 hover:ring-success hover:ring-offset-2 transition-all select-none" data-filter="Excelente" title="Clic para filtrar por Excelente">
+        <dt class="text-xs font-semibold text-success uppercase tracking-wider">Excelente</dt>
+        <dd class="mt-1 text-3xl font-semibold text-success">{{ stats.excelente }}</dd>
+    </div>
+    <div class="audit-filter-card bg-base-100 shadow-md rounded-lg px-4 py-5 text-center cursor-pointer hover:ring-2 hover:ring-info hover:ring-offset-2 transition-all select-none" data-filter="Buena" title="Clic para filtrar por Buena">
+        <dt class="text-xs font-semibold text-info uppercase tracking-wider">Buena</dt>
+        <dd class="mt-1 text-3xl font-semibold text-info">{{ stats.buena }}</dd>
+    </div>
+    <div class="audit-filter-card bg-base-100 shadow-md rounded-lg px-4 py-5 text-center cursor-pointer hover:ring-2 hover:ring-warning hover:ring-offset-2 transition-all select-none" data-filter="Aceptable" title="Clic para filtrar por Aceptable">
+        <dt class="text-xs font-semibold text-warning uppercase tracking-wider">Aceptable</dt>
+        <dd class="mt-1 text-3xl font-semibold text-warning">{{ stats.aceptable }}</dd>
+    </div>
+    <div class="audit-filter-card bg-base-100 shadow-md rounded-lg px-4 py-5 text-center cursor-pointer hover:ring-2 hover:ring-error hover:ring-offset-2 transition-all select-none" data-filter="Deficiente" title="Clic para filtrar por Deficiente">
+        <dt class="text-xs font-semibold text-error uppercase tracking-wider">Deficiente</dt>
+        <dd class="mt-1 text-3xl font-semibold text-error">{{ stats.deficiente }}</dd>
+    </div>
+</div>
+
+<!-- Records table -->
+<div x-data="auditDiffData()">
+<div class="bg-base-100 shadow rounded-lg overflow-hidden">
+    <div class="px-4 py-5 border-b border-base-200 sm:px-6 flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-3">
+            <h3 class="text-lg font-medium">Registros de Auditoría</h3>
+            <div class="flex gap-2">
+                <input type="text" id="filterSessionId" class="input input-primary input-sm" placeholder="Filtrar por session ID...">
+                <button type="button" id="btnFiltrar" class="btn btn-sm btn-primary">Filtrar</button>
+                <button type="button" id="btnLimpiarFiltro" class="btn btn-sm btn-ghost" title="Limpiar filtros">✕</button>
+            </div>
+        </div>
+        <div class="flex items-center gap-2" x-show="selectedIds.length > 0" x-cloak>
+            <span class="text-sm opacity-80" x-text="selectedIds.length + ' seleccionado(s)'"></span>
+            <button type="button" class="btn btn-sm btn-error" @click="deleteSelected()" :disabled="deleting">
+                <span x-show="!deleting">Borrar</span>
+                <span x-show="deleting" x-cloak>Borrando…</span>
+            </button>
+        </div>
+        {% if stats.ajustar %}
+        <span class="badge badge-warning gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+            {{ stats.ajustar }} para ajustar
+        </span>
+        {% endif %}
+        <button type="button" class="btn btn-sm btn-outline btn-primary" @click="openScripts()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            Scripts
+        </button>
+    </div>
+
+    <!-- Modal Scripts -->
+    <dialog id="scriptsModal" class="modal">
+        <div class="modal-box w-11/12 max-w-3xl bg-base-200">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            </form>
+            <h3 class="font-bold text-lg mb-4">Scripts de prueba del chatbot</h3>
+
+            <!-- Tabs -->
+            <div role="tablist" class="tabs tabs-box mb-4">
+                <button role="tab" class="tab" :class="scriptTab === 'parse' && 'tab-active'" @click="scriptTab = 'parse'">
+                    📄 Parsear chat WhatsApp
+                </button>
+                <button role="tab" class="tab" :class="scriptTab === 'send' && 'tab-active'" @click="scriptTab = 'send'">
+                    📨 Enviar mensajes
+                </button>
+            </div>
+
+            <!-- Tab: Parsear -->
+            <div x-show="scriptTab === 'parse'" class="space-y-3">
+                <p class="text-sm opacity-70">Lee un .txt de WhatsApp exportado en <code>chats/</code> y genera un JSON de mensajes del cliente.</p>
+                <div class="flex items-center gap-3">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" x-model="parseTodos">
+                        <span class="text-sm">Procesar todos los .txt</span>
+                    </label>
+                </div>
+                <div x-show="!parseTodos">
+                    <label class="text-xs font-semibold uppercase opacity-60 mb-1 block">Archivo .txt</label>
+                    <select class="select select-sm select-bordered w-full" x-model="parseTxtFile">
+                        <option value="">-- seleccionar --</option>
+                        <template x-for="f in chatFiles.txt" :key="f">
+                            <option :value="f" x-text="f"></option>
+                        </template>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-sm btn-primary" @click="runScript('parse')" :disabled="scriptRunning">
+                    <span x-show="!scriptRunning">Ejecutar</span>
+                    <span x-show="scriptRunning" x-cloak class="loading loading-spinner loading-xs"></span>
+                    <span x-show="scriptRunning" x-cloak>Ejecutando…</span>
+                </button>
+            </div>
+
+            <!-- Tab: Enviar -->
+            <div x-show="scriptTab === 'send'" class="space-y-3">
+                <div class="flex gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" class="radio radio-sm radio-primary" x-model="sendMode" value="file">
+                        <span class="text-sm">Desde JSON</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" class="radio radio-sm radio-primary" x-model="sendMode" value="direct">
+                        <span class="text-sm">Envío directo</span>
+                    </label>
+                </div>
+
+                <!-- Desde archivo JSON -->
+                <div x-show="sendMode === 'file'" class="space-y-2">
+                    <label class="text-xs font-semibold uppercase opacity-60 mb-1 block">Archivo .json</label>
+                    <select class="select select-sm select-bordered w-full" x-model="sendJsonFile">
+                        <option value="">-- seleccionar --</option>
+                        <template x-for="f in chatFiles.json" :key="f">
+                            <option :value="f" x-text="f"></option>
+                        </template>
+                    </select>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" x-model="sendPrueba">
+                        <span class="text-sm">Solo primer mensaje (--prueba)</span>
+                    </label>
+                </div>
+
+                <!-- Envío directo -->
+                <div x-show="sendMode === 'direct'" class="space-y-2">
+                    <div>
+                        <label class="text-xs font-semibold uppercase opacity-60 mb-1 block">Teléfono (ej: 59169023378)</label>
+                        <input type="text" class="input input-sm input-bordered w-full" x-model="sendPhone" placeholder="59169023378">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold uppercase opacity-60 mb-1 block">Mensaje</label>
+                        <input type="text" class="input input-sm input-bordered w-full" x-model="sendMsg" placeholder="000">
+                    </div>
+                </div>
+
+                <!-- Opciones comunes -->
+                <details class="text-xs">
+                    <summary class="cursor-pointer opacity-60 hover:opacity-100">Opciones avanzadas</summary>
+                    <div class="mt-2 space-y-2 pl-2">
+                        <div>
+                            <label class="opacity-60 mb-1 block">URL del webhook</label>
+                            <input type="text" class="input input-xs input-bordered w-full" x-model="sendUrl" placeholder="https://n8npozos.magoreal.com/webhook/chat">
+                        </div>
+                        <div>
+                            <label class="opacity-60 mb-1 block">Timeout (seg)</label>
+                            <input type="number" class="input input-xs input-bordered w-24" x-model="sendTimeout" min="10" max="300">
+                        </div>
+                    </div>
+                </details>
+
+                <button type="button" class="btn btn-sm btn-primary" @click="runScript('send')" :disabled="scriptRunning">
+                    <span x-show="!scriptRunning">Ejecutar</span>
+                    <span x-show="scriptRunning" x-cloak class="loading loading-spinner loading-xs"></span>
+                    <span x-show="scriptRunning" x-cloak>Ejecutando…</span>
+                </button>
+            </div>
+
+            <!-- Output -->
+            <div x-show="scriptOutput !== null" class="mt-4">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xs font-semibold uppercase opacity-60">Output</span>
+                    <span x-show="scriptRunning" x-cloak class="loading loading-spinner loading-xs text-primary"></span>
+                    <span x-show="!scriptRunning && scriptOk === true" class="badge badge-success badge-sm">OK</span>
+                    <span x-show="!scriptRunning && scriptOk === false" class="badge badge-error badge-sm">Error</span>
+                    <span x-show="scriptRunning" x-cloak class="text-xs opacity-50">Ejecutando… (puedes cerrar el modal)</span>
+                </div>
+                <pre
+                    class="bg-base-300 rounded p-3 text-xs overflow-x-auto max-h-72 overflow-y-auto whitespace-pre-wrap font-mono"
+                    x-text="scriptOutput"
+                    x-effect="scriptOutput; $nextTick(() => { $el.scrollTop = $el.scrollHeight })"
+                ></pre>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
+
+    <div class="p-4 overflow-x-auto" style="min-width: 1400px;">
+        <table id="auditTable" class="table w-full display text-sm text-left bg-base-100">
+            <thead>
+                <tr class="bg-base-300 text-base-content uppercase tracking-wider text-xs">
+                    <th class="audit-col-checkbox px-1 py-3 font-semibold uppercase tracking-wider text-xs">
+                        <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                            :checked="allIds.length > 0 && selectedIds.length === allIds.length"
+                            :indeterminate.prop="selectedIds.length > 0 && selectedIds.length < allIds.length"
+                            @change="toggleSelectAll($event.target.checked)" />
+                    </th>
+                    <th class="w-10">Session ID</th>
+                    <th class="w-44">Input</th>
+                    <th class="min-w-48">Output</th>
+                    <th class="">Evaluación</th>
+                    <th class="">Score</th>
+                    <th class="">State</th>
+                    <th class="">Flag</th>
+                    <th class="max-w-10 text-center">Orquestador</th>
+                    <th class="max-w-10 text-center">Subagente</th>
+                    <th class="">Ajustar</th>
+                    <th class="">Detalle</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records %}
+                <tr class="audit-main-row bg-base-100! transition-colors" data-evaluacion="{{ r.evaluacion|default:''|lower }}">
+                    <td class="audit-col-checkbox px-1 py-3 align-middle">
+                        <input type="checkbox" class="checkbox checkbox-sm"
+                            data-row-id="{{ r.id|default:'' }}"
+                            :checked="selectedIds.includes('{{ r.id|default:"" }}')"
+                            @change="toggleRow('{{ r.id|default:"" }}', $event.target.checked)" />
+                    </td>
+                    <td class="px-4 py-3 font-mono text-base-content">{{ r.sessionId|default:"-" }}</td>
+                    <td class="px-4 py-3 text-xs whitespace-normal wrap-break-words text-base-content">{{ r.input|default:"-" }}</td>
+                    <td class="px-4 py-3 text-xs whitespace-normal wrap-break-words text-base-content">{{ r.output|default:"-" }}</td>
+                    <td class="px-4 py-3">
+                        {% with ev=r.evaluacion|lower %}
+                        {% if ev == "excelente" %}
+                            <span class="badge badge-success">{{ r.evaluacion }}</span>
+                        {% elif ev == "buena" %}
+                            <span class="badge badge-info">{{ r.evaluacion }}</span>
+                        {% elif ev == "aceptable" %}
+                            <span class="badge badge-warning">{{ r.evaluacion }}</span>
+                        {% elif ev == "deficiente" %}
+                            <span class="badge badge-error">{{ r.evaluacion }}</span>
+                        {% else %}
+                            <span class="badge badge-neutral badge-sm">{{ r.evaluacion|default:"-" }}</span>
+                        {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="font-semibold
+                            {% if r.score_global >= 8 %}text-success
+                            {% elif r.score_global >= 6 %}text-info
+                            {% elif r.score_global >= 4 %}text-warning
+                            {% else %}text-error{% endif %}">
+                            {{ r.score_global|default:"-" }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-xs opacity-70">{{ r.state|default:"-" }}</td>
+                    <td class="px-4 py-3">
+                        {% if r.flag %}
+                            <span class="badge badge-outline badge-sm">{{ r.flag }}</span>
+                        {% else %}
+                            <span class="text-base-content opacity-30">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-xs">{{ r.orquestador|default:"-" }}</td>
+                    <td class="px-4 py-3 text-xs">{{ r.subagente|default:"-" }}</td>
+                    <td class="px-4 py-3 align-middle">
+                        <span class="inline-flex items-center" title="{% if r.ajustar_workflow %}Ajustar{% else %}Sin ajuste{% endif %}">
+                            <span class="relative inline-block w-10 h-5 rounded-full
+                                {% if r.ajustar_workflow %}bg-success{% else %}bg-base-300 opacity-60{% endif %}">
+                                <span class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow
+                                    {% if r.ajustar_workflow %}right-0.5 left-auto{% else %}left-0.5{% endif %}"></span>
+                            </span>
+                        </span>
+                    </td>
+                    <td class="px-4 py-3">
+                        <button
+                            class="btn btn-xs btn-ghost text-primary"
+                            @click="const idx = {{ forloop.counter0 }}; selected = (selected === idx) ? null : idx; if (selected === idx) runDiff(idx)"
+                        >Ver</button>
+                    </td>
+                </tr>
+                <!-- Expandable detail row: 12 td para DataTables. Contenido con position:absolute para ocupar todo el ancho de la fila. -->
+                <tr class="audit-diff-row audit-diff-row-wrapper" data-evaluacion="{{ r.evaluacion|default:''|lower }}" x-show="selected === {{ forloop.counter0 }}" x-cloak x-transition>
+                    <td class="p-0 border-none align-top">
+                        <div class="audit-diff-spacer" aria-hidden="true"></div>
+                        <div class="audit-diff-content bg-base-100 px-6 py-4">
+                        <!-- Prompt comparison: side by side with diff -->
+                        <div class="audit-diff-panels flex flex-row gap-4 mb-6 w-full">
+                            <div class="rounded-lg border border-gray-600 overflow-hidden shadow-sm flex-1 min-w-0 bg-[#252526]">
+                                <div class="px-3 py-2 bg-[#2d2d30] font-bold text-gray-300 text-sm uppercase tracking-wider border-b border-gray-600">Prompt Inicial</div>
+                                <div id="diff-left-{{ forloop.counter0 }}" class="p-4 whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto min-h-48"></div>
+                                <div id="raw-inicial-{{ forloop.counter0 }}" class="hidden" data-value="{{ r.prompt_inicial_b64 }}"></div>
+                            </div>
+                            <div class="rounded-lg border border-gray-600 overflow-hidden shadow-sm flex-1 min-w-0 bg-[#252526]">
+                                <div class="px-3 py-2 bg-[#2d2d30] font-bold text-gray-300 text-sm uppercase tracking-wider flex justify-between items-center border-b border-gray-600">
+                                    <span>Prompt de Ajuste</span>
+                                    <div class="flex gap-2">
+                                        <button type="button" class="btn btn-xs btn-primary" @click="savePrompt({{ forloop.counter0 }})" :disabled="saving">
+                                            <span x-show="!saving">Guardar</span>
+                                            <span x-show="saving" x-cloak>Guardando…</span>
+                                        </button>
+                                        <button type="button" class="btn btn-xs btn-error" @click="updateNodePrompt({{ forloop.counter0 }})" :disabled="updatingNode" title="Actualizar el system prompt del nodo en n8n">
+                                            <span x-show="!updatingNode">Actualizar n8n</span>
+                                            <span x-show="updatingNode" x-cloak>Actualizando…</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="diff-right-{{ forloop.counter0 }}" contenteditable="true" data-row-id="{{ r.id|default:'' }}"
+                                    data-workflow-id="{{ r.workflow_id|default:workflow_prompt_id }}"
+                                    data-node-id="{{ r.nodo_ajuste_id|default:'' }}"
+                                    data-inicial-starts-eq="{% if r.prompt_inicial and r.prompt_inicial.0 == '=' %}1{% endif %}"
+                                    class="p-4 whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto min-h-48 outline-none"
+                                    @input="onAjusteInput({{ forloop.counter0 }})"></div>
+                                <div id="raw-ajuste-{{ forloop.counter0 }}" class="hidden" data-value="{{ r.prompt_ajuste_b64 }}"></div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-white mb-2 font-bold">
+                            <span class="inline-block w-3 h-3 rounded bg-red-300 mr-1 align-middle"></span> Eliminado en ajuste
+                            <span class="inline-block w-3 h-3 rounded bg-green-300 ml-3 mr-1 align-middle"></span> Añadido en ajuste
+                        </p>
+                        <!-- Rest of detail -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div class="bg-base-200 text-base-content rounded-lg p-4 border border-base-300">
+                                <p class="font-bold mb-1 uppercase text-xs tracking-wider">Input</p>
+                                <p class="whitespace-pre-wrap">{{ r.input|default:"—" }}</p>
+                            </div>
+                            <div class="bg-base-200 text-base-content rounded-lg p-4 border border-base-300">
+                                <p class="font-bold mb-1 uppercase text-xs tracking-wider">Output</p>
+                                <p class="whitespace-pre-wrap">{{ r.output|default:"—" }}</p>
+                            </div>
+                            <div class="bg-base-200 text-base-content rounded-lg p-4 border border-base-300">
+                                <p class="font-bold mb-1 uppercase text-xs tracking-wider">Observaciones</p>
+                                <p class="whitespace-pre-wrap">{{ r.observaciones|default:"—" }}</p>
+                            </div>
+                            <div class="bg-base-200 text-base-content rounded-lg p-4 border border-base-300">
+                                <p class="font-bold mb-1 uppercase text-xs tracking-wider">Mejora Sugerida</p>
+                                <p class="whitespace-pre-wrap">{{ r.mejora_sugerida|default:"—" }}</p>
+                            </div>
+                        </div>
+                        </div>
+                    </td>
+                    <td class="hidden"></td><td class="hidden"></td><td class="hidden"></td><td class="hidden"></td><td class="hidden"></td><td class="hidden"></td>
+                    <td class="hidden"></td><td class="hidden"></td><td class="hidden"></td><td class="hidden"></td><td class="hidden"></td>
+                </tr>
+                {% empty %}
+                <tr class="bg-base-100">
+                    <td class="px-4 py-8 text-center text-base-content opacity-40">No hay registros de auditoría.</td>
+                    <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<!-- Toast DaisyUI (fuera de overflow para que se vea) -->
+<div class="toast toast-top toast-end z-50" x-show="toastVisible" x-cloak x-transition>
+    <div class="alert" :class="toastType === 'success' ? 'alert-success' : 'alert-error'">
+        <span x-text="toastMessage"></span>
+    </div>
+</div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function auditDiffData() {
+    const allIdsEl = document.getElementById('audit-all-ids');
+    const allIds = allIdsEl ? JSON.parse(allIdsEl.textContent || '[]') : [];
+    return {
+        allIds,
+        selectedIds: [],
+        deleting: false,
+        selected: null,
+        saving: false,
+        updatingNode: false,
+        toastVisible: false,
+        toastMessage: '',
+        toastType: 'success',
+        // Scripts modal
+        scriptTab: 'parse',
+        scriptRunning: false,
+        scriptOutput: null,
+        scriptOk: null,
+        chatFiles: { txt: [], json: [] },
+        parseTodos: false,
+        parseTxtFile: '',
+        sendMode: 'file',
+        sendJsonFile: '',
+        sendPrueba: false,
+        sendPhone: '',
+        sendMsg: '000',
+        sendUrl: '',
+        sendTimeout: 120,
+        currentJobId: null,
+        _pollTimer: null,
+        toggleRow(id, checked) {
+            if (!id) return;
+            if (checked) {
+                if (!this.selectedIds.includes(id)) this.selectedIds.push(id);
+            } else {
+                this.selectedIds = this.selectedIds.filter(x => x !== id);
+            }
+        },
+        toggleSelectAll(checked) {
+            this.selectedIds = checked ? [...this.allIds] : [];
+        },
+        deleteSelected() {
+            if (!this.selectedIds.length) return;
+            if (!confirm('¿Borrar ' + this.selectedIds.length + ' registro(s) seleccionado(s)?')) return;
+            const csrf = document.cookie.split('; ').find(r => r.startsWith('csrftoken='));
+            const csrfToken = csrf ? csrf.split('=')[1] : '';
+            this.deleting = true;
+            fetch('{% url "audit_delete_rows" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ row_ids: this.selectedIds })
+            }).then(r => r.json()).then(data => {
+                this.deleting = false;
+                if (data.ok) {
+                    this.showToast('Registros borrados correctamente', 'success');
+                    window.location.reload();
+                } else {
+                    this.showToast(data.error || 'Error al borrar.', 'error');
+                }
+            }).catch(e => {
+                this.deleting = false;
+                this.showToast('Error: ' + (e.message || 'ver consola'), 'error');
+            });
+        },
+        showToast(msg, type) {
+            this.toastMessage = msg;
+            this.toastType = type || 'success';
+            this.toastVisible = true;
+            setTimeout(() => { this.toastVisible = false; }, 3000);
+        },
+        async openScripts() {
+            if (!this.scriptRunning) {
+                this.scriptOutput = null;
+                this.scriptOk = null;
+                this.currentJobId = null;
+            }
+            document.getElementById('scriptsModal').showModal();
+            if (!this.chatFiles.txt.length && !this.chatFiles.json.length) {
+                const res = await fetch('{% url "audit_list_chats" %}');
+                this.chatFiles = await res.json();
+            }
+        },
+        async runScript(script) {
+            const csrf = document.cookie.split('; ').find(r => r.startsWith('csrftoken='));
+            const csrfToken = csrf ? csrf.split('=')[1] : '';
+            let params = {};
+            if (script === 'parse') {
+                if (this.parseTodos) {
+                    params = { por_archivo: true };
+                } else {
+                    if (!this.parseTxtFile) { this.showToast('Selecciona un archivo .txt', 'error'); return; }
+                    params = { archivo: this.parseTxtFile };
+                }
+            } else {
+                if (this.sendMode === 'file') {
+                    if (!this.sendJsonFile) { this.showToast('Selecciona un archivo .json', 'error'); return; }
+                    // Abrir ventana de selección antes de ejecutar
+                    const qs = new URLSearchParams({
+                        archivo: this.sendJsonFile,
+                        prueba: this.sendPrueba ? '1' : '',
+                        url: this.sendUrl || '',
+                        timeout: this.sendTimeout || 120,
+                    });
+                    window.open('/audit/script-send-select/?' + qs.toString(), '_blank',
+                        'width=1200,height=720,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+                    return;
+                } else {
+                    if (!this.sendPhone) { this.showToast('Ingresa un número de teléfono', 'error'); return; }
+                    params = { send_phone: this.sendPhone, send_msg: this.sendMsg || '000' };
+                }
+                if (this.sendUrl) params.url = this.sendUrl;
+                params.timeout = this.sendTimeout;
+            }
+            if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
+            this.scriptRunning = true;
+            this.scriptOutput = '';
+            this.scriptOk = null;
+            this.currentJobId = null;
+            try {
+                const res = await fetch('{% url "audit_run_script" %}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                    body: JSON.stringify({ script, params })
+                });
+                const data = await res.json();
+                if (!data.ok || !data.job_id) {
+                    this.scriptOk = false;
+                    this.scriptOutput = data.error || 'Error al iniciar el script';
+                    this.scriptRunning = false;
+                    return;
+                }
+                this.currentJobId = data.job_id;
+                const _script = script;
+                const _openMonitor = _script === 'send' && this.sendMode === 'file';
+                // Para envío desde JSON: abrir ventana nueva del navegador (no pestaña)
+                if (_openMonitor) {
+                    window.open('/audit/script-monitor/' + this.currentJobId + '/', '_blank', 'width=900,height=650,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes');
+                    this.scriptOutput = 'Script iniciado. Sigue el progreso en la ventana del monitor.';
+                }
+                this._pollTimer = setInterval(async () => {
+                    try {
+                        const pr = await fetch('/audit/script-output/' + this.currentJobId + '/');
+                        const pd = await pr.json();
+                        if (!_openMonitor) {
+                            this.scriptOutput = pd.output || '';
+                        }
+                        if (!pd.running) {
+                            clearInterval(this._pollTimer);
+                            this._pollTimer = null;
+                            this.scriptRunning = false;
+                            this.scriptOk = pd.ok;
+                            if (_openMonitor) {
+                                this.scriptOutput = pd.ok
+                                    ? 'Script finalizado correctamente.'
+                                    : 'Script finalizado con error o cancelado.';
+                            }
+                            if (_script === 'parse' && pd.ok) {
+                                const r2 = await fetch('{% url "audit_list_chats" %}');
+                                this.chatFiles = await r2.json();
+                            }
+                        }
+                    } catch (_) {}
+                }, 500);
+            } catch (e) {
+                this.scriptOk = false;
+                this.scriptOutput = 'Error de conexión: ' + (e.message || 'ver consola');
+                this.scriptRunning = false;
+            }
+        },
+        getRawPrompt(el) {
+            const v = el && el.getAttribute('data-value');
+            if (!v) return (el && el.textContent) || '';
+            try { return decodeURIComponent(escape(atob(v))) || ''; } catch (_) { return v; }
+        },
+        runDiff(idx) {
+            this.$nextTick(() => {
+                setTimeout(() => {
+                    const leftEl = document.getElementById('diff-left-' + idx);
+                    const rightEl = document.getElementById('diff-right-' + idx);
+                    const leftRaw = document.getElementById('raw-inicial-' + idx);
+                    const rightRaw = document.getElementById('raw-ajuste-' + idx);
+                    if (!leftEl || !rightEl || !leftRaw || !rightRaw) return;
+                    const oldStr = this.getRawPrompt(leftRaw).trim();
+                    let newStr = (rightEl.innerText || rightEl.textContent || this.getRawPrompt(rightRaw) || '').trim();
+                    if (oldStr.startsWith('=') && !newStr.startsWith('=')) newStr = '=' + newStr;
+                    this.updateDiff(leftEl, rightEl, oldStr, newStr);
+                }, 100);
+            });
+        },
+        updateDiff(leftEl, rightEl, oldStr, newStr) {
+            if (typeof Diff !== 'undefined' && (oldStr || newStr)) {
+                const changes = Diff.diffWords(oldStr, newStr);
+                let leftHtml = '', rightHtml = '';
+                changes.forEach(part => {
+                    const escaped = part.value.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+                    if (part.removed) {
+                        leftHtml += '<span class="bg-red-200 text-red-900 rounded px-0.5">' + escaped + '</span>';
+                    } else if (part.added) {
+                        rightHtml += '<span class="bg-green-200 text-green-900 rounded px-0.5">' + escaped + '</span>';
+                    } else {
+                        leftHtml += escaped;
+                        rightHtml += escaped;
+                    }
+                });
+                leftEl.innerHTML = leftHtml;
+                if (rightEl) rightEl.innerHTML = rightHtml;
+            } else {
+                leftEl.textContent = oldStr || '—';
+                if (rightEl) rightEl.textContent = newStr || '—';
+            }
+        },
+        onAjusteInput(idx) {
+            // No actualizar el panel izquierdo: Prompt Inicial queda fijo tras cargar
+        },
+        updateNodePrompt(idx) {
+            const rightEl = document.getElementById('diff-right-' + idx);
+            const rowId = rightEl ? rightEl.getAttribute('data-row-id') : '';
+            const workflowId = rightEl ? rightEl.getAttribute('data-workflow-id') : '';
+            const nodeId = rightEl ? rightEl.getAttribute('data-node-id') : '';
+            if (!rightEl || !rowId) {
+                alert('No se puede actualizar: falta identificador del registro.');
+                return;
+            }
+            if (!workflowId || !nodeId) {
+                alert('Falta workflow_id o nodo_ajuste_id en el registro.');
+                return;
+            }
+            const text = (rightEl.innerText || rightEl.textContent || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const csrf = document.cookie.split('; ').find(r => r.startsWith('csrftoken='));
+            const csrfToken = csrf ? csrf.split('=')[1] : '';
+            this.updatingNode = true;
+            fetch('{% url "audit_update_node_prompt" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ row_id: rowId, prompt_ajuste: text, workflow_id: workflowId, node_id: nodeId })
+            }).then(r => {
+                this.updatingNode = false;
+                return r.json().then(data => {
+                    if (data.ok) {
+                        const rightRaw = document.getElementById('raw-ajuste-' + idx);
+                        if (rightRaw) rightRaw.setAttribute('data-value', btoa(unescape(encodeURIComponent(text))));
+                        this.showToast('Tabla y nodo actualizados en n8n', 'success');
+                    } else {
+                        this.showToast(data.error || 'Error al actualizar nodo.', 'error');
+                    }
+                }).catch(() => {
+                    this.showToast('Error ' + r.status + ': respuesta no válida.', 'error');
+                });
+            }).catch(e => {
+                this.updatingNode = false;
+                this.showToast('Error de conexión: ' + (e.message || 'ver consola'), 'error');
+            });
+        },
+        savePrompt(idx) {
+            const rightEl = document.getElementById('diff-right-' + idx);
+            const rowId = rightEl ? rightEl.getAttribute('data-row-id') : '';
+            if (!rightEl || !rowId) {
+                alert('No se puede guardar: falta identificador del registro.');
+                return;
+            }
+            const text = (rightEl.innerText || rightEl.textContent || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const csrf = document.cookie.split('; ').find(r => r.startsWith('csrftoken='));
+            const csrfToken = csrf ? csrf.split('=')[1] : '';
+            this.saving = true;
+            fetch('{% url "audit_update_prompt" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ row_id: rowId, prompt_ajuste: text })
+            }).then(r => {
+                this.saving = false;
+                return r.json().then(data => {
+                    if (data.ok) {
+                        const rightRaw = document.getElementById('raw-ajuste-' + idx);
+                        if (rightRaw) rightRaw.setAttribute('data-value', btoa(unescape(encodeURIComponent(text))));
+                        this.showToast('Guardado correctamente', 'success');
+                    } else {
+                        this.showToast(data.error || 'Error al guardar.', 'error');
+                    }
+                }).catch(() => {
+                    this.showToast('Error ' + r.status + ': respuesta no válida.', 'error');
+                });
+            }).catch((e) => {
+                this.saving = false;
+                this.showToast('Error de conexión: ' + (e.message || 'ver consola'), 'error');
+            });
+        }
+    };
+}
+</script>
+<script>
+    $(document).ready(function() {
+        const table = $('#auditTable').DataTable({
+            responsive: false,
+            paging: true,
+            pageLength: 25,
+            lengthMenu: [10, 25, 50, 100],
+            ordering: false,
+            searching: true,
+            orderCellsTop: true,
+            columnDefs: [
+                { targets: 0, width: '28px' },   /* Checkbox - mínimo */
+                { targets: 1, width: '80px' },  /* Session ID */
+                { targets: 2, width: '150px' },  /* Input */
+                { targets: 3, width: '150px' },  /* Output */
+                { targets: 4, width: '90px' },   /* Evaluación */
+                { targets: 5, width: '60px' },   /* Score */
+                { targets: 6, width: '90px' },   /* State */
+                { targets: 7, width: '80px' },   /* Flag */
+                { targets: 8, width: '100px' },  /* Orquestador */
+                { targets: 9, width: '100px' },  /* Subagente */
+                { targets: 10, width: '70px' },  /* Ajustar */
+                { targets: 11, width: '70px' }   /* Detalle */
+            ]
+        });
+        const SESSION_COL = 1;
+        let activeEvalFilter = null;
+
+        // Filtro personalizado por evaluación (usa data-evaluacion en cada fila)
+        const evalFilterFn = function(settings, data, dataIndex) {
+            if (activeEvalFilter === null) return true;
+            var tbl = settings.nTable;
+            if (!tbl || tbl.id !== 'auditTable') return true;
+            var rowData = settings.aoData && settings.aoData[dataIndex];
+            var row = rowData && rowData.nTr;
+            if (!row || !row.getAttribute) return true;
+            var ev = (row.getAttribute('data-evaluacion') || '').trim();
+            return ev === activeEvalFilter.toLowerCase();
+        };
+        $.fn.dataTable.ext.search.push(evalFilterFn);
+
+        function applyFilters() {
+            table.column(SESSION_COL).search($('#filterSessionId').val()).draw();
+        }
+        function clearAllFilters() {
+            $('#filterSessionId').val('');
+            activeEvalFilter = null;
+            table.column(SESSION_COL).search('').draw();
+            table.draw();
+            $('.audit-filter-card').removeClass('ring-2 ring-offset-2 ring-success ring-info ring-warning ring-error ring-primary');
+            $('.audit-filter-card[data-filter="all"]').addClass('ring-2 ring-offset-2 ring-primary');
+        }
+
+        $('#filterSessionId').on('keyup', applyFilters);
+        $('#btnFiltrar').on('click', applyFilters);
+        $('#btnLimpiarFiltro').on('click', clearAllFilters);
+
+        // Filtrar por evaluación al hacer clic en las tarjetas (Total=ver todos, clic de nuevo quita el filtro)
+        $('.audit-filter-card').on('click', function() {
+            const filter = $(this).data('filter');
+            const isActive = activeEvalFilter === filter;
+            $('.audit-filter-card').removeClass('ring-2 ring-offset-2 ring-success ring-info ring-warning ring-error ring-primary');
+            if (filter === 'all' || isActive) {
+                activeEvalFilter = null;
+                table.draw();
+                if (filter === 'all') $(this).addClass('ring-2 ring-offset-2 ring-primary');
+            } else {
+                activeEvalFilter = filter;
+                table.draw();
+                const colorClass = $(this).find('dt').hasClass('text-success') ? 'ring-success' :
+                    $(this).find('dt').hasClass('text-info') ? 'ring-info' :
+                    $(this).find('dt').hasClass('text-warning') ? 'ring-warning' :
+                    $(this).find('dt').hasClass('text-error') ? 'ring-error' : 'ring-primary';
+                $(this).addClass('ring-2 ring-offset-2 ' + colorClass);
+            }
+        });
+        // Estado inicial: Total activo
+        $('.audit-filter-card[data-filter="all"]').addClass('ring-2 ring-offset-2 ring-primary');
+    });
+</script>
+{% endblock %}

@@ -32,7 +32,7 @@ yarn-error.log*
 .npm
 .eslintcache
 
-# Environment variables
+# Variables de entorno
 .env
 .env.local
 .env.*.local
@@ -44,9 +44,6 @@ yarn-error.log*
 *.swo
 *~
 
-# Docker
-.dockerignore
-
 # Logs
 *.log
 logs/
@@ -55,12 +52,28 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Volumes de Docker (si están en el proyecto)
-volumes/
+# Datos de servicios Docker (bind mounts) — solo trackear .gitkeep
+n8n_storage/*
+!n8n_storage/.gitkeep
+postgres_storage/*
+!postgres_storage/.gitkeep
+chroma_storage/*
+!chroma_storage/.gitkeep
+shared/*
+!shared/.gitkeep
 
-# ChromaDB storage (bind mount) - ignorar contenido pero mantener directorio
-deploy/chroma_storage/*
-!deploy/chroma_storage/.gitkeep
-chroma-backup/
+# Django
+chats/*
+!chats/.gitkeep
+workflows/*.gitkeep
+dj/db.sqlite3
+dj/staticfiles/
+dj/static/css/tailwind.css
+!dj/static/css/.gitkeep
 
+# Backups
+backups/*
+!backups/.gitkeep
 
+# Nginx — config generada por make nginx-config (específica del dominio)
+*.conf

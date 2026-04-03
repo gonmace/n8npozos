@@ -62,6 +62,20 @@ else
     exit 1
 fi
 
+# --- Base de datos Django ---
+DJANGO_DB=${DJANGO_DB:-n8n_django}
+echo "🔍 Verificando si la base de datos Django '$DJANGO_DB' existe..."
+DJANGO_DB_EXISTS=$(docker exec $POSTGRES_CONTAINER psql -U $POSTGRES_USER -tAc \
+    "SELECT 1 FROM pg_database WHERE datname='$DJANGO_DB'" postgres 2>/dev/null || echo "")
+if [ -z "$DJANGO_DB_EXISTS" ] || [ "$DJANGO_DB_EXISTS" != "1" ]; then
+    echo "📦 Creando base de datos Django '$DJANGO_DB'..."
+    docker exec $POSTGRES_CONTAINER psql -U $POSTGRES_USER -c \
+        "CREATE DATABASE \"$DJANGO_DB\";" postgres
+    echo "✅ Base de datos '$DJANGO_DB' creada"
+else
+    echo "✅ Base de datos '$DJANGO_DB' ya existe"
+fi
+
 echo ""
 echo "✅ Base de datos inicializada correctamente"
 echo "🚀 Ahora puedes iniciar n8n con:"

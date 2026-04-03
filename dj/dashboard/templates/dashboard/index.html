@@ -1,0 +1,148 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Dashboard | n8n Manager{% endblock %}
+
+{% block extra_head %}
+{% endblock %}
+
+{% block content %}
+            <!-- Stats -->
+            <!-- Conversaciones Stats -->
+            <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 mb-8">
+                <div class="bg-base-100 overflow-hidden shadow-md rounded-lg">
+                    <div class="px-4 py-5 sm:p-6 text-center">
+                        <dt class="text-xs font-semibold text-base-content uppercase tracking-wider">Conversaciones</dt>
+                        <dd class="mt-1 text-3xl font-semibold text-primary">{{ stats.total_conversations }}</dd>
+                    </div>
+                </div>
+                <div class="bg-base-100 overflow-hidden shadow-md rounded-lg">
+                    <div class="px-4 py-5 sm:p-6 text-center">
+                        <dt class="text-xs font-semibold text-base-content uppercase tracking-wider">Cotizados</dt>
+                        <dd class="mt-1 text-3xl font-semibold text-success">{{ stats.conversations_with_price }}</dd>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Workflows Stats -->
+            <div class="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
+                <div class="bg-base-100 overflow-hidden shadow-md rounded-lg">
+                    <div class="px-4 py-5 sm:p-6 text-center">
+                        <dt class="text-xs font-semibold text-base-content opacity-70 uppercase tracking-wider">Total Workflows</dt>
+                        <dd class="mt-1 text-3xl font-semibold text-base-content">{{ stats.total }}</dd>
+                    </div>
+                </div>
+                <div class="bg-base-100 overflow-hidden shadow-md rounded-lg">
+                    <div class="px-4 py-5 sm:p-6 text-center">
+                        <dt class="text-xs font-semibold text-base-content opacity-70 uppercase tracking-wider">Active</dt>
+                        <dd class="mt-1 text-3xl font-semibold text-success">{{ stats.active }}</dd>
+                    </div>
+                </div>
+                <div class="bg-base-100 overflow-hidden shadow-md rounded-lg">
+                    <div class="px-4 py-5 sm:p-6 text-center">
+                        <dt class="text-xs font-semibold text-base-content opacity-70 uppercase tracking-wider">Inactive</dt>
+                        <dd class="mt-1 text-3xl font-semibold text-base-content opacity-40">{{ stats.inactive }}</dd>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workflows Table -->
+            <div class="bg-base-100 shadow rounded-lg overflow-hidden mb-8">
+                <div class="px-4 py-5 border-b border-base-200 sm:px-6">
+                    <h3 class="text-lg leading-6 font-medium text-base-content">Workflows</h3>
+                </div>
+                <div class="p-4">
+                    <table id="workflowsTable" class="w-full display text-sm text-left">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Name</th>
+                                <th>ID</th>
+                                <th>Tags</th>
+                                <th>Updated</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for workflow in workflows %}
+                            <tr>
+                                <td>
+                                    {% if workflow.active %}
+                                        <div class="badge badge-success gap-2">Active</div>
+                                    {% else %}
+                                        <div class="badge badge-ghost gap-2">Inactive</div>
+                                    {% endif %}
+                                </td>
+                                <td class="font-medium text-base-content">{{ workflow.name }}</td>
+                                <td class="font-mono text-base-content opacity-50 text-xs">{{ workflow.id }}</td>
+                                <td>
+                                     {% for tag in workflow.tags %}
+                                        <span class="badge badge-outline badge-sm mr-1">{{ tag.name }}</span>
+                                    {% endfor %}
+                                </td>
+                                <td class="text-base-content opacity-60 text-xs">{{ workflow.updatedAt|slice:":10" }}</td>
+                                <td>
+                                    <a href="{% url 'workflow_detail' workflow.id %}" class="btn btn-xs btn-ghost text-primary hover:bg-base-200">Ver</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recent Executions -->
+             <div class="bg-base-100 shadow rounded-lg overflow-hidden">
+                <div class="px-4 py-5 border-b border-base-200 sm:px-6">
+                    <h3 class="text-lg leading-6 font-medium text-base-content">Recent Executions</h3>
+                </div>
+                <div class="p-4">
+                     <table id="executionsTable" class="w-full display text-sm text-left">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Workflow ID</th>
+                                <th>Status</th>
+                                <th>Started</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for exec in executions %}
+                            <tr>
+                                <td class="font-mono text-xs text-base-content opacity-50">{{ exec.id }}</td>
+                                <td class="text-base-content text-xs">{{ exec.workflowId }}</td>
+                                <td>
+                                    {% if exec.finished %}
+                                        <span class="badge badge-success badge-sm font-semibold">Success</span>
+                                    {% else %}
+                                        <span class="badge badge-error badge-sm font-semibold">Error</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-base-content opacity-60 text-xs">{{ exec.startedAt|slice:":19" }}</td>
+                                <td class="text-base-content opacity-60 text-xs">{{ exec.stoppedAt|slice:":19" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script>
+        $(document).ready(function() {
+            $('#workflowsTable').DataTable({
+                responsive: true,
+                pageLength: 10,
+                lengthMenu: [5, 10, 25, 50],
+                order: [[ 4, "desc" ]] // Sort by Updated desc
+            });
+            $('#executionsTable').DataTable({
+                responsive: true,
+                pageLength: 5,
+                lengthMenu: [5, 10],
+                order: [[ 3, "desc" ]] // Sort by Started desc
+            });
+        });
+    </script>
+{% endblock %}
