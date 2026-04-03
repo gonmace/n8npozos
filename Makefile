@@ -66,23 +66,17 @@ restore: ## Restaurar desde backups/
 clean: ## Limpiar contenedores, imágenes y volúmenes
 	@./scripts/clean.sh
 
-nginx-config: ## Generar e instalar configuración nginx (requiere sudo). Usar FORCE=1 para sobreescribir
+nginx-config: ## Generar e instalar configuración nginx (requiere sudo)
 	@./scripts/generate-nginx.sh
 	@NGINX_CONF=$$(grep -v '^\s*#' .env | grep ^DOMAIN= | cut -d= -f2).conf; \
-	DEST="/etc/nginx/sites-available/$$NGINX_CONF"; \
-	if [ -f "$$DEST" ] && [ "$(FORCE)" != "1" ]; then \
-		echo "⚠️  $$DEST ya existe — omitiendo instalación para no sobreescribir SSL"; \
-		echo "   Usá 'make nginx-config FORCE=1' para reemplazarlo"; \
+	sudo cp "$$NGINX_CONF" "/etc/nginx/sites-available/$$NGINX_CONF"; \
+	sudo ln -sf "/etc/nginx/sites-available/$$NGINX_CONF" "/etc/nginx/sites-enabled/$$NGINX_CONF"; \
+	if sudo nginx -t 2>/dev/null; then \
+		sudo systemctl reload nginx; \
+		echo "✅ Nginx recargado correctamente"; \
 	else \
-		sudo cp "$$NGINX_CONF" "$$DEST"; \
-		sudo ln -sf "$$DEST" "/etc/nginx/sites-enabled/$$NGINX_CONF"; \
-		if sudo nginx -t 2>/dev/null; then \
-			sudo systemctl reload nginx; \
-			echo "✅ Nginx recargado correctamente"; \
-		else \
-			echo "⚠️  Error en la configuración de nginx"; \
-			sudo nginx -t; \
-		fi; \
+		echo "⚠️  Error en la configuración de nginx"; \
+		sudo nginx -t; \
 	fi
 
 # ── Interno ───────────────────────────────────────────────────────────────────
