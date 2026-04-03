@@ -5,6 +5,10 @@ set -e
 
 echo "🚀 Iniciando entorno de producción..."
 
+# Actualizar código desde el repositorio
+echo "📥 Actualizando código (git pull)..."
+git pull
+
 # Verificar que existe .env
 if [ ! -f .env ]; then
     echo "❌ Error: Archivo .env no encontrado. Es requerido para producción."

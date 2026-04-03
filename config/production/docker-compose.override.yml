@@ -4,7 +4,7 @@
 services:
   gradio:
     build:
-      context: ../..
+      context: ..
       dockerfile: docker/gradio/Dockerfile
     environment:
       ENV: production
