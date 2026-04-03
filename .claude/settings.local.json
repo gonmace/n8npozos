@@ -46,7 +46,13 @@
       "Bash(grep -il \"password\\\\|\\\\\"apiKey\\\\\"\\\\|\\\\\"secret\\\\\"\\\\|\\\\\"token\\\\\"\" /home/gonzalo/n8npozos/workflows/*.json)",
       "Bash(git add:*)",
       "Bash(sudo lsof:*)",
-      "Bash(fuser 8008/tcp)"
+      "Bash(fuser 8008/tcp)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)",
+      "Bash(ls /home/gonzalo/n8npozos/*.conf)",
+      "Bash(ssh:*)",
+      "Bash(sudo chown:*)",
+      "Bash(docker events:*)"
     ]
   }
 }
