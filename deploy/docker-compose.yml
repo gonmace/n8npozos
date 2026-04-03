@@ -197,6 +197,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      n8n:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/admin/login/')"]
       interval: 30s
