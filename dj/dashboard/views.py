@@ -1,5 +1,41 @@
+import docker as docker_sdk
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import render
+from django.views.decorators.http import require_POST
 from .n8n_service import N8nService
+
+MCP_CONTAINER = "n8npozos-n8n-mcp"
+
+
+def _mcp_status():
+    try:
+        client = docker_sdk.from_env()
+        container = client.containers.get(MCP_CONTAINER)
+        return container.status  # "running", "exited", etc.
+    except docker_sdk.errors.NotFound:
+        return "not_found"
+    except Exception:
+        return "error"
+
+
+@login_required
+@require_POST
+def mcp_toggle(request):
+    try:
+        client = docker_sdk.from_env()
+        container = client.containers.get(MCP_CONTAINER)
+        if container.status == "running":
+            container.stop()
+            new_status = "exited"
+        else:
+            container.start()
+            new_status = "running"
+        return JsonResponse({"status": new_status})
+    except docker_sdk.errors.NotFound:
+        return JsonResponse({"error": "Contenedor no encontrado"}, status=404)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 def index(request):
     service = N8nService()
@@ -18,7 +54,8 @@ def index(request):
 
     context = {
         'workflows': workflows,
-        'executions': executions, # Recent executions
+        'executions': executions,
+        'mcp_status': _mcp_status(),
         'stats': {
             'total': total_workflows,
             'active': active_workflows,

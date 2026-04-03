@@ -45,6 +45,48 @@
                 </div>
             </div>
 
+            <!-- MCP Control -->
+            <div class="bg-base-100 shadow-md rounded-lg px-4 py-4 mb-8 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-base-content uppercase tracking-wider">n8n MCP Server</p>
+                    <p id="mcp-status-text" class="text-sm mt-1
+                        {% if mcp_status == 'running' %}text-success{% else %}text-base-content opacity-50{% endif %}">
+                        {% if mcp_status == 'running' %}Activo{% elif mcp_status == 'exited' %}Detenido{% else %}{{ mcp_status }}{% endif %}
+                    </p>
+                </div>
+                <button id="mcp-toggle-btn"
+                    class="btn btn-sm {% if mcp_status == 'running' %}btn-error{% else %}btn-success{% endif %}"
+                    hx-post="{% url 'mcp_toggle' %}"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    hx-swap="none"
+                    onclick="mcpToggle(this)">
+                    {% if mcp_status == 'running' %}Detener{% else %}Iniciar{% endif %}
+                </button>
+            </div>
+
+            <script>
+            function mcpToggle(btn) {
+                btn.disabled = true;
+                btn.textContent = 'Espera…';
+                fetch("{% url 'mcp_toggle' %}", {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': '{{ csrf_token }}'},
+                })
+                .then(r => r.json())
+                .then(data => {
+                    const running = data.status === 'running';
+                    btn.textContent = running ? 'Detener' : 'Iniciar';
+                    btn.className = 'btn btn-sm ' + (running ? 'btn-error' : 'btn-success');
+                    const txt = document.getElementById('mcp-status-text');
+                    txt.textContent = running ? 'Activo' : 'Detenido';
+                    txt.className = 'text-sm mt-1 ' + (running ? 'text-success' : 'text-base-content opacity-50');
+                    btn.disabled = false;
+                })
+                .catch(() => { btn.textContent = 'Error'; btn.disabled = false; });
+                return false;
+            }
+            </script>
+
             <!-- Workflows Table -->
             <div class="bg-base-100 shadow rounded-lg overflow-hidden mb-8">
                 <div class="px-4 py-5 border-b border-base-200 sm:px-6">
