@@ -57,6 +57,9 @@ tailwind: ## CSS Tailwind  [WATCH=1 para modo dev]
 backup: ## Backup de volúmenes
 	@./scripts/backup.sh
 
+push-data: ## Empaquetar n8n + ChromaDB, commitear y pushear al repo
+	@./scripts/push-data.sh
+
 restore: ## Restaurar desde backups/
 	@./scripts/restore.sh
 
