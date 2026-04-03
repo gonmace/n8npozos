@@ -63,8 +63,18 @@ restore: ## Restaurar desde backups/
 clean: ## Limpiar contenedores, imágenes y volúmenes
 	@./scripts/clean.sh
 
-nginx-config: ## Generar configuración nginx desde .env
+nginx-config: ## Generar e instalar configuración nginx (requiere sudo)
 	@./scripts/generate-nginx.sh
+	@NGINX_CONF=$$(grep -v '^\s*#' .env | grep ^DOMAIN= | cut -d= -f2).conf; \
+	sudo cp "$$NGINX_CONF" "/etc/nginx/sites-available/$$NGINX_CONF"; \
+	sudo ln -sf "/etc/nginx/sites-available/$$NGINX_CONF" "/etc/nginx/sites-enabled/$$NGINX_CONF"; \
+	if sudo nginx -t 2>/dev/null; then \
+		sudo systemctl reload nginx; \
+		echo "✅ Nginx recargado correctamente"; \
+	else \
+		echo "⚠️  Error en la configuración de nginx"; \
+		sudo nginx -t; \
+	fi
 
 # ── Interno ───────────────────────────────────────────────────────────────────
 
