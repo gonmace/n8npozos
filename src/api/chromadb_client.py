@@ -370,6 +370,62 @@ def get_collection_info(collection_name: str) -> Dict[str, Any]:
         raise Exception(f"Error al obtener información de la colección: {error_msg}")
 
 
+def create_document(collection_name: str, text: str, metadata: Optional[Dict[str, Any]] = None, doc_id: Optional[str] = None) -> str:
+    """Add a new document to a collection. Returns the doc_id."""
+    import uuid
+    client_instance = _get_client()
+    if client_instance is None:
+        raise Exception(f"ChromaDB no está disponible en {CHROMA_HOST}:{CHROMA_PORT}")
+    if not doc_id:
+        doc_id = str(uuid.uuid4())
+    collection = get_collection(collection_name)
+    kwargs: Dict[str, Any] = {"documents": [text], "ids": [doc_id]}
+    if metadata:
+        kwargs["metadatas"] = [metadata]
+    collection.add(**kwargs)
+    return doc_id
+
+
+def update_document(collection_name: str, doc_id: str, text: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+    """Update an existing document."""
+    client_instance = _get_client()
+    if client_instance is None:
+        raise Exception(f"ChromaDB no está disponible en {CHROMA_HOST}:{CHROMA_PORT}")
+    collection = get_collection(collection_name)
+    if metadata:
+        collection.update(ids=[doc_id], documents=[text], metadatas=[metadata])
+    else:
+        # ChromaDB update requires consistent metadata; delete+add to clear metadata
+        collection.delete(ids=[doc_id])
+        collection.add(documents=[text], ids=[doc_id])
+
+
+def delete_document(collection_name: str, doc_id: str) -> None:
+    """Delete a document by ID."""
+    client_instance = _get_client()
+    if client_instance is None:
+        raise Exception(f"ChromaDB no está disponible en {CHROMA_HOST}:{CHROMA_PORT}")
+    collection = get_collection(collection_name)
+    collection.delete(ids=[doc_id])
+
+
+def get_document(collection_name: str, doc_id: str) -> Dict[str, Any]:
+    """Get a single document by ID."""
+    client_instance = _get_client()
+    if client_instance is None:
+        raise Exception(f"ChromaDB no está disponible en {CHROMA_HOST}:{CHROMA_PORT}")
+    collection = get_collection(collection_name)
+    result = collection.get(ids=[doc_id], include=["documents", "metadatas"])
+    if not result.get("ids"):
+        raise Exception(f"Documento '{doc_id}' no encontrado")
+    meta = result["metadatas"][0] if result.get("metadatas") else {}
+    return {
+        "id": result["ids"][0],
+        "document": result["documents"][0] if result.get("documents") else "",
+        "metadata": meta or {},
+    }
+
+
 def mmr_search(
     collection_name: str,
     query: str,

@@ -137,6 +137,11 @@ USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='https://n8npozos.magoreal.com').split(',')
 
+# ChromaDB / API microservice
+CHROMA_API_URL = config('CHROMA_API_URL', default='http://api:8009')
+CHROMA_COLLECTION = config('CHROMA_COLLECTION', default='pozos')
+N8N_WHATSAPP_WEBHOOK = config('N8N_WHATSAPP_WEBHOOK', default='')
+
 # N8n Configuration
 N8N_API_KEY = config('N8N_API_KEY', default='')
 N8N_URL = config('N8N_URL', default='https://n8npozos.magoreal.com')

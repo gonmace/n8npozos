@@ -34,6 +34,9 @@
                         <a href="{% url 'audit_index' %}" class="{% if request.resolver_match.url_name == 'audit_index' %}border-primary text-base-content{% else %}border-transparent text-base-content opacity-50 hover:border-base-300 hover:text-primary{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                             Auditoría
                         </a>
+                        <a href="{% url 'chromadb_index' %}" class="{% if request.resolver_match.url_name == 'chromadb_index' %}border-primary text-base-content{% else %}border-transparent text-base-content opacity-50 hover:border-base-300 hover:text-primary{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Embeddings
+                        </a>
                     </div>
                 </div>
                 </div>

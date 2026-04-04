@@ -1,15 +1,14 @@
-# N8N + ChromaDB + Gradio + Django Stack
+# N8N + ChromaDB + Django Stack
 
-Stack completo para automatización con n8n, base de datos vectorial ChromaDB, panel de administración Gradio, microservicio API de búsqueda semántica y dashboard Django para monitoreo y auditoría de conversaciones WhatsApp.
+Stack completo para automatización con n8n, base de datos vectorial ChromaDB, microservicio API de búsqueda semántica y dashboard Django para monitoreo, auditoría y gestión de embeddings.
 
 ## Servicios
 
 | Servicio | Descripción | Producción | Desarrollo local |
 |---|---|---|---|
 | **n8n** | Motor de automatización de workflows | `https://dominio.com/` | http://localhost:6001 |
-| **Django Dashboard** | Monitoreo y auditoría de conversaciones | `https://dominio.com/dashboard/` | http://localhost:6004 |
-| **Gradio** | Panel admin de ChromaDB (embeddings) | `https://dominio.com/gradio/` | http://localhost:6002 |
-| **API** | Búsqueda MMR sobre ChromaDB (FastAPI) | `https://dominio.com/api/` | http://localhost:6003 |
+| **Django Dashboard** | Monitoreo, auditoría y gestión de embeddings | `https://dominio.com/dashboard/` | http://localhost:6004 |
+| **API** | CRUD + búsqueda MMR sobre ChromaDB (FastAPI) | `https://dominio.com/api/` | http://localhost:6003 |
 | **n8n-MCP** | Servidor MCP para AI IDEs | `https://dominio.com/mcp` | http://localhost:6005/mcp |
 | **PostgreSQL** | Base de datos de n8n y Django | interno | localhost:5433 |
 | **ChromaDB** | Base de datos vectorial | interno | localhost:8200 |
@@ -28,14 +27,12 @@ Nginx corre en el host y enruta el tráfico a los contenedores Docker.
 │   ├── audit/                 # App: auditoría de prompts y conversaciones
 │   └── theme/                 # Tailwind CSS + daisyUI (fuente en static_src/)
 ├── src/
-│   ├── gradio/app.py          # Panel admin ChromaDB
-│   └── api/main.py            # API REST — endpoint MMR
+│   └── api/main.py            # API REST — CRUD de embeddings + búsqueda MMR
 ├── docker/
 │   ├── django/Dockerfile      # Imagen Django (incluye build de Tailwind + collectstatic)
-│   ├── gradio/Dockerfile
 │   └── api/Dockerfile
 ├── deploy/
-│   ├── docker-compose.yml     # Stack completo (7 servicios)
+│   ├── docker-compose.yml     # Stack completo (6 servicios)
 │   └── nginx.conf.template    # Template de nginx (usa envsubst)
 ├── config/
 │   ├── production/            # Override docker-compose para producción
@@ -93,7 +90,6 @@ Variables mínimas a cambiar en `.env`:
 | `POSTGRES_PASSWORD` | password seguro |
 | `N8N_ENCRYPTION_KEY` | `openssl rand -base64 32` |
 | `N8N_USER_MANAGEMENT_JWT_SECRET` | `openssl rand -base64 32` |
-| `GRADIO_AUTH_PASSWORD` | password seguro |
 | `OPENAI_API_KEY` | desde platform.openai.com |
 | `MCP_AUTH_TOKEN` | string libre como Bearer token |
 | `DJANGO_SECRET_KEY` | `python -c "import secrets; print(secrets.token_urlsafe(50))"` |
@@ -170,16 +166,6 @@ make django CMD=createsuperuser
 
 ## Desarrollo local
 
-### Primera vez: entorno virtual Python
-
-Para correr Gradio o la API fuera de Docker:
-
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt        # Gradio + ChromaDB
-pip install -r requirements-dev.txt    # dependencias adicionales
-```
-
 ### Levantar todos los servicios en modo desarrollo
 
 ```bash
@@ -200,11 +186,11 @@ Servicios disponibles:
 |---|---|---|
 | n8n | http://localhost:6001 | cuenta propia |
 | Django Dashboard | http://localhost:6004 | superusuario Django |
-| Gradio (Docker) | http://localhost:6002 | `GRADIO_AUTH_USERNAME` / `GRADIO_AUTH_PASSWORD` del `.env` |
+| Django Embeddings | http://localhost:6004/chromadb/ | superusuario Django |
 | API (docs) | http://localhost:6003/api/docs | — |
 | n8n-MCP | http://localhost:6005/mcp | Bearer `MCP_AUTH_TOKEN` del `.env` |
 
-> Los puertos por defecto son 6001–6005. Pueden cambiarse en `.env` si hay conflictos.
+> Los puertos por defecto son 6001–6005 (sin Gradio). Pueden cambiarse en `.env` si hay conflictos.
 
 ### CSS — Tailwind + daisyUI
 
@@ -233,17 +219,9 @@ El `N8N_API_KEY` del `.env` lo usa Django para consultar la API de n8n. En desar
    docker compose --env-file .env -f deploy/docker-compose.yml -f config/development/docker-compose.override.yml up -d django
    ```
 
-### Correr Gradio fuera de Docker
-
-```bash
-source .venv/bin/activate
-python src/gradio/app.py
-```
-
 ### Correr la API fuera de Docker
 
 ```bash
-source .venv/bin/activate
 cd src/api && python main.py
 ```
 
@@ -251,7 +229,7 @@ cd src/api && python main.py
 
 ## Django Dashboard
 
-Permite monitorear y auditar las conversaciones del chatbot WhatsApp integrado con n8n.
+Permite monitorear y auditar las conversaciones del chatbot WhatsApp integrado con n8n, y gestionar la base de conocimiento de ChromaDB.
 
 ### Funcionalidades
 
@@ -259,6 +237,7 @@ Permite monitorear y auditar las conversaciones del chatbot WhatsApp integrado c
 - **Control MCP** — botón para iniciar/detener el contenedor `n8n-mcp` desde el dashboard (ahorra recursos cuando no se usa)
 - **Historial de chats** — conversaciones con metadatos (teléfono, cotización, ubicación)
 - **Auditoría** — revisar y ajustar prompts del sistema, puntuar respuestas del bot
+- **Embeddings** (`/dashboard/chromadb/`) — gestión completa de la base de conocimiento ChromaDB
 
 ### Arquitectura de datos
 
@@ -274,6 +253,34 @@ La única base de datos propia de Django (`n8n_django`) guarda sesiones y usuari
 - Tema: `pozo-silk` (dark, definido en `dj/theme/static_src/src/styles.css`)
 - El Dockerfile compila el CSS durante el build de la imagen
 - En desarrollo, `make tailwind WATCH=1` recompila automáticamente
+
+---
+
+## Embeddings — Gestión de ChromaDB
+
+Disponible en `/dashboard/chromadb/` dentro del Django Dashboard.
+
+### Funcionalidades
+
+| Función | Descripción |
+|---|---|
+| **Listar** | Tabla con todos los embeddings (ID, texto, categoría, source) con búsqueda y filtros |
+| **Crear** | Formulario para agregar un documento con texto, categoría y source |
+| **Editar** | Click en una fila para cargar el form de edición inline |
+| **Eliminar** | Botón por fila o selección múltiple con checkbox |
+| **Eliminación masiva** | Select all + eliminar N embeddings en un click |
+| **Importar JSON** | Sube un JSON array → crea todos los documentos en batch |
+| **Exportar JSON** | Descarga todos los embeddings como archivo JSON |
+| **WhatsApp** | Sube archivo `.txt` o `.json` de WhatsApp → POST a webhook n8n |
+| **Estadísticas** | Panel superior con total y conteo por categoría |
+
+### Arquitectura
+
+```
+Django → HTTP → FastAPI API → ChromaDB
+```
+
+Django llama al microservicio FastAPI (`http://api:8009`) para todas las operaciones. La colección activa se define con `CHROMA_COLLECTION` en `.env` (default: `pozos`).
 
 ---
 
@@ -350,11 +357,23 @@ curl https://tu-dominio.com/mcp/health
 
 ---
 
-## API — Búsqueda MMR
+## API — Embeddings + Búsqueda MMR
 
-Expone búsqueda semántica con **Maximum Marginal Relevance** (resultados relevantes y diversos).
+Microservicio FastAPI con dos grupos de endpoints. Documentación interactiva: `https://tu-dominio.com/api/docs`
 
-### `POST /api/retrievers/collections/{collection_name}/mmr`
+### CRUD de documentos
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `GET` | `/api/collections/{collection}/documents` | Listar todos los documentos |
+| `POST` | `/api/collections/{collection}/documents` | Crear documento |
+| `GET` | `/api/collections/{collection}/documents/{id}` | Obtener documento |
+| `PUT` | `/api/collections/{collection}/documents/{id}` | Actualizar documento |
+| `DELETE` | `/api/collections/{collection}/documents/{id}` | Eliminar documento |
+
+### Búsqueda MMR
+
+`POST /api/retrievers/collections/{collection_name}/mmr`
 
 ```json
 {
@@ -375,8 +394,6 @@ Expone búsqueda semántica con **Maximum Marginal Relevance** (resultados relev
 | `lambda_mult` | `0.0` = solo relevancia · `1.0` = solo diversidad | `0.5` |
 | `min_score` | Score mínimo de similitud (0–1) | `0.4` |
 | `filters` | Filtros sobre metadata | `null` |
-
-Documentación interactiva: `https://tu-dominio.com/api/docs`
 
 ---
 
@@ -428,12 +445,10 @@ make logs                    # Todos los servicios
 make logs SVC=n8n            # Logs de un servicio específico
 make logs SVC=django
 make logs SVC=api
-make logs SVC=gradio
 
 # Shells
 make shell SVC=django        # Shell en contenedor
 make shell SVC=api
-make shell SVC=gradio
 make shell SVC=n8n
 make shell SVC=postgres      # psql en PostgreSQL
 
@@ -476,8 +491,7 @@ Ver `.env.example` para la lista completa con descripción de cada variable.
 | `N8N_SECURE_COOKIE` | `true` en producción con HTTPS, `false` en desarrollo |
 | `OPENAI_API_KEY` | Clave de OpenAI para embeddings |
 | `EMBEDDING_MODEL` | Modelo de embeddings (default: `text-embedding-3-large`) |
-| `GRADIO_AUTH_USERNAME` | Usuario del panel Gradio |
-| `GRADIO_AUTH_PASSWORD` | Password del panel Gradio |
+| `N8N_WHATSAPP_WEBHOOK` | Webhook n8n para procesar archivos WhatsApp desde la página de Embeddings (opcional) |
 | `MCP_AUTH_TOKEN` | Bearer token para el servidor MCP |
 | `DJANGO_SECRET_KEY` | Clave secreta de Django |
 | `DJANGO_DB` | Nombre de la DB de Django (default: `n8n_django`) |
@@ -490,8 +504,7 @@ Ver `.env.example` para la lista completa con descripción de cada variable.
 
 **Routing:**
 - `/` → n8n (con WebSocket)
-- `/dashboard/` → Django Dashboard
-- `/gradio/` → Gradio (con WebSocket)
+- `/dashboard/` → Django Dashboard (incluye `/dashboard/chromadb/`)
 - `/api/` → FastAPI
 - `/mcp` → n8n-MCP
 

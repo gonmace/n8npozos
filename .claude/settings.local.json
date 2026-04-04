@@ -53,7 +53,8 @@
       "Bash(ssh:*)",
       "Bash(sudo chown:*)",
       "Bash(docker events:*)",
-      "Bash(docker top:*)"
+      "Bash(docker top:*)",
+      "Bash(grep -o 'class=\"[^\"]*\\\\\\(btn\\\\|badge\\\\|chat\\\\|hero\\\\|loading\\\\|drawer\\\\|dropdown\\\\\\)[^\"]*\"' /home/gonzalo/n8npozos/dj/dashboard/templates/dashboard/*.html)"
     ]
   }
 }

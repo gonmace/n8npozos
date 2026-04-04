@@ -1,8 +1,11 @@
+import json
 import docker as docker_sdk
-from django.http import JsonResponse
+from django.conf import settings
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_POST
 from .n8n_service import N8nService
+from .chromadb_service import ChromaDBService
 
 MCP_CONTAINER = "n8npozos-n8n-mcp"
 
@@ -133,3 +136,137 @@ def chat_history(request):
     }
 
     return render(request, 'dashboard/chat_history.html', context)
+
+
+# ── ChromaDB views ────────────────────────────────────────────────────────────
+
+def chromadb_index(request):
+    svc = ChromaDBService()
+    documents = svc.list_documents()
+    stats = svc.get_stats(documents)
+    return render(request, 'dashboard/chromadb.html', {
+        'documents_json': json.dumps(documents, ensure_ascii=False),
+        'stats': stats,
+        'collection': svc.collection,
+        'whatsapp_webhook_default': getattr(settings, 'N8N_WHATSAPP_WEBHOOK', ''),
+    })
+
+
+@require_POST
+def chromadb_create(request):
+    try:
+        data = json.loads(request.body)
+        text = data.get('text', '').strip()
+        if not text:
+            return JsonResponse({'ok': False, 'error': 'El texto no puede estar vacío'})
+        svc = ChromaDBService()
+        doc_id = svc.create_document(
+            text=text,
+            categoria=data.get('categoria', '').strip() or None,
+            source=data.get('source', '').strip() or None,
+        )
+        return JsonResponse({'ok': True, 'id': doc_id})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+@require_POST
+def chromadb_update(request, doc_id):
+    try:
+        data = json.loads(request.body)
+        text = data.get('text', '').strip()
+        if not text:
+            return JsonResponse({'ok': False, 'error': 'El texto no puede estar vacío'})
+        svc = ChromaDBService()
+        svc.update_document(
+            doc_id=doc_id,
+            text=text,
+            categoria=data.get('categoria', '').strip() or None,
+            source=data.get('source', '').strip() or None,
+        )
+        return JsonResponse({'ok': True})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+@require_POST
+def chromadb_delete(request, doc_id):
+    try:
+        ChromaDBService().delete_document(doc_id)
+        return JsonResponse({'ok': True})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+@require_POST
+def chromadb_bulk_delete(request):
+    try:
+        data = json.loads(request.body)
+        ids = data.get('ids', [])
+        if not ids:
+            return JsonResponse({'ok': False, 'error': 'No se enviaron IDs'})
+        errors = ChromaDBService().bulk_delete(ids)
+        deleted = len(ids) - len(errors)
+        return JsonResponse({'ok': True, 'deleted': deleted, 'errors': errors})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+def chromadb_get(request, doc_id):
+    try:
+        doc = ChromaDBService().get_document(doc_id)
+        return JsonResponse({'ok': True, 'doc': doc})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=404)
+
+
+def chromadb_export(request):
+    try:
+        documents = ChromaDBService().list_documents()
+        content = json.dumps(documents, ensure_ascii=False, indent=2)
+        response = HttpResponse(content, content_type='application/json')
+        response['Content-Disposition'] = 'attachment; filename="embeddings.json"'
+        return response
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+@require_POST
+def chromadb_whatsapp(request):
+    import requests as req_lib
+    try:
+        n8n_url = request.POST.get('n8n_url', '').strip()
+        if not n8n_url:
+            return JsonResponse({'ok': False, 'error': 'URL de n8n es requerida'})
+        if not n8n_url.startswith(('http://', 'https://')):
+            return JsonResponse({'ok': False, 'error': 'URL inválida'})
+
+        archivo = request.FILES.get('archivo')
+        if not archivo:
+            return JsonResponse({'ok': False, 'error': 'No se subió ningún archivo'})
+
+        filename = archivo.name
+        content = archivo.read().decode('utf-8', errors='replace')
+        file_type = 'json' if filename.lower().endswith('.json') else 'txt'
+
+        payload = {'file_content': content, 'filename': filename, 'file_type': file_type}
+        if file_type == 'json':
+            try:
+                payload['data'] = json.loads(content)
+            except json.JSONDecodeError as e:
+                return JsonResponse({'ok': False, 'error': f'JSON inválido: {e}'})
+
+        r = req_lib.post(n8n_url, json=payload, timeout=30, headers={'Content-Type': 'application/json'})
+        if r.status_code == 200:
+            try:
+                result = r.json()
+            except Exception:
+                result = r.text
+            return JsonResponse({'ok': True, 'result': result})
+        return JsonResponse({'ok': False, 'error': f'n8n respondió {r.status_code}: {r.text[:200]}'})
+    except req_lib.exceptions.Timeout:
+        return JsonResponse({'ok': False, 'error': 'Timeout al conectar con n8n'})
+    except req_lib.exceptions.ConnectionError:
+        return JsonResponse({'ok': False, 'error': 'No se pudo conectar con n8n'})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)

@@ -1,0 +1,439 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Embeddings | n8n Manager{% endblock %}
+
+{% block content %}
+<div x-data="chromadbApp()" x-cloak>
+
+  <!-- Stats bar -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="bg-base-100 rounded-lg shadow-md px-4 py-4 text-center">
+      <div class="text-xs font-semibold text-base-content opacity-60 uppercase tracking-wider">Total</div>
+      <div class="text-3xl font-bold text-primary mt-1">{{ stats.total }}</div>
+    </div>
+    {% for cat, count in stats.by_category.items %}
+    <div class="bg-base-100 rounded-lg shadow-md px-4 py-4 text-center">
+      <div class="text-xs font-semibold text-base-content opacity-60 uppercase tracking-wider truncate">{{ cat }}</div>
+      <div class="text-3xl font-bold text-base-content mt-1">{{ count }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Tabs -->
+  <div class="bg-base-100 rounded-lg shadow-md">
+    <div class="tabs tabs-box border-b border-base-200 px-4 pt-2">
+      <button class="tab" :class="tab === 'list' && 'tab-active'" @click="tab = 'list'">Embeddings</button>
+      <button class="tab" :class="tab === 'create' && 'tab-active'" @click="tab = 'create'">Crear</button>
+      <button class="tab" :class="tab === 'whatsapp' && 'tab-active'" @click="tab = 'whatsapp'">WhatsApp</button>
+    </div>
+
+    <div class="p-4 sm:p-6">
+
+      <!-- ── Tab: Lista ─────────────────────────────────────────── -->
+      <div x-show="tab === 'list'">
+
+        <!-- Toolbar -->
+        <div class="flex flex-wrap gap-2 mb-3">
+          <button class="btn btn-sm btn-ghost" @click="exportJson()">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Exportar JSON
+          </button>
+          <label class="btn btn-sm btn-ghost cursor-pointer">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12"/></svg>
+            Importar JSON
+            <input type="file" accept=".json" class="hidden" @change="importJson($event)">
+          </label>
+          <div x-show="importing" class="flex items-center gap-2 text-sm text-base-content opacity-60">
+            <span class="loading loading-spinner loading-xs"></span>
+            <span x-text="importProgress"></span>
+          </div>
+        </div>
+
+        <!-- Bulk delete bar -->
+        <div x-show="selectedIds.length > 0" class="flex items-center gap-3 mb-3 px-3 py-2 bg-warning/10 rounded-lg border border-warning/30">
+          <span class="text-sm font-medium" x-text="selectedIds.length + ' seleccionado(s)'"></span>
+          <button class="btn btn-sm btn-error" :disabled="deleting" @click="bulkDelete()">
+            <span x-show="!deleting">Eliminar selección</span>
+            <span x-show="deleting" class="loading loading-spinner loading-xs"></span>
+          </button>
+          <button class="btn btn-sm btn-ghost" @click="selectedIds = []">Cancelar</button>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table id="embeddings-table" class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-xs text-base-content opacity-50 uppercase tracking-wider border-b border-base-200">
+                <th class="pb-2 pr-3 w-8">
+                  <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                    @change="toggleSelectAll($event.target.checked)"
+                    :checked="selectedIds.length === docs.length && docs.length > 0">
+                </th>
+                <th class="pb-2 pr-3">ID</th>
+                <th class="pb-2 pr-3">Texto</th>
+                <th class="pb-2 pr-3">Categoría</th>
+                <th class="pb-2 pr-3">Source</th>
+                <th class="pb-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="doc in filteredDocs" :key="doc.id">
+                <tr class="border-b border-base-200 hover:bg-base-200/50 transition-colors">
+                  <td class="py-2 pr-3">
+                    <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                      :checked="selectedIds.includes(doc.id)"
+                      @change="toggleRow(doc.id, $event.target.checked)">
+                  </td>
+                  <td class="py-2 pr-3">
+                    <span class="font-mono text-xs text-base-content opacity-50 select-all" x-text="doc.id.substring(0,8) + '…'"></span>
+                  </td>
+                  <td class="py-2 pr-3 max-w-xs">
+                    <span class="line-clamp-2" x-text="doc.document"></span>
+                  </td>
+                  <td class="py-2 pr-3">
+                    <span class="badge badge-sm badge-outline" x-show="doc.metadata?.categoria" x-text="doc.metadata?.categoria"></span>
+                  </td>
+                  <td class="py-2 pr-3 text-xs opacity-60" x-text="doc.metadata?.source || ''"></td>
+                  <td class="py-2 text-right whitespace-nowrap">
+                    <button class="btn btn-xs btn-ghost" @click="startEdit(doc)">Editar</button>
+                    <button class="btn btn-xs btn-error btn-outline" @click="deleteSingle(doc.id)">✕</button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="filteredDocs.length === 0">
+                <td colspan="6" class="py-8 text-center text-base-content opacity-40">Sin embeddings</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Category filter -->
+        <div class="flex items-center gap-2 mt-3">
+          <span class="text-xs text-base-content opacity-50">Filtrar:</span>
+          <select class="select select-xs select-bordered" x-model="categoryFilter">
+            <option value="">Todas las categorías</option>
+            <template x-for="cat in categories" :key="cat">
+              <option :value="cat" x-text="cat"></option>
+            </template>
+          </select>
+          <input type="text" class="input input-xs input-bordered flex-1 max-w-xs" placeholder="Buscar texto…" x-model="textFilter">
+        </div>
+
+        <!-- Edit form inline -->
+        <div x-show="editDoc" class="mt-6 p-4 bg-base-200 rounded-lg border border-base-300">
+          <h3 class="text-sm font-semibold mb-3">Editar embedding</h3>
+          <p class="text-xs font-mono text-base-content opacity-50 mb-3" x-text="'ID: ' + (editDoc?.id || '')"></p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="sm:col-span-2">
+              <label class="text-xs font-medium mb-1 block">Texto</label>
+              <textarea class="textarea textarea-bordered w-full text-sm" rows="4" x-model="editForm.text"></textarea>
+            </div>
+            <div class="flex flex-col gap-3">
+              <div>
+                <label class="text-xs font-medium mb-1 block">Categoría</label>
+                <input type="text" class="input input-sm input-bordered w-full" x-model="editForm.categoria">
+              </div>
+              <div>
+                <label class="text-xs font-medium mb-1 block">Source</label>
+                <input type="text" class="input input-sm input-bordered w-full" x-model="editForm.source">
+              </div>
+            </div>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button class="btn btn-sm btn-primary" :disabled="saving" @click="saveEdit()">
+              <span x-show="!saving">Actualizar</span>
+              <span x-show="saving" class="loading loading-spinner loading-xs"></span>
+            </button>
+            <button class="btn btn-sm btn-ghost" @click="editDoc = null">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tab: Crear ─────────────────────────────────────────── -->
+      <div x-show="tab === 'create'">
+        <div class="max-w-2xl">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="sm:col-span-2">
+              <label class="text-sm font-medium mb-1 block">Texto del documento</label>
+              <textarea class="textarea textarea-bordered w-full text-sm" rows="6"
+                placeholder="Ingresa el texto que quieres convertir en embedding…"
+                x-model="createForm.text"></textarea>
+            </div>
+            <div class="flex flex-col gap-3">
+              <div>
+                <label class="text-sm font-medium mb-1 block">Categoría</label>
+                <input type="text" class="input input-sm input-bordered w-full"
+                  placeholder="Ej: documentos, preguntas"
+                  x-model="createForm.categoria">
+              </div>
+              <div>
+                <label class="text-sm font-medium mb-1 block">Source</label>
+                <input type="text" class="input input-sm input-bordered w-full"
+                  placeholder="Ej: manual, importado"
+                  x-model="createForm.source">
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary mt-4" :disabled="creating" @click="createEmbedding()">
+            <span x-show="!creating">Crear Embedding</span>
+            <span x-show="creating" class="loading loading-spinner loading-xs"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Tab: WhatsApp ──────────────────────────────────────── -->
+      <div x-show="tab === 'whatsapp'">
+        <div class="max-w-xl">
+          <div class="mb-4">
+            <label class="text-sm font-medium mb-1 block">URL del Webhook n8n</label>
+            <input type="text" class="input input-sm input-bordered w-full"
+              placeholder="https://n8npozos.magoreal.com/webhook/data_test"
+              x-model="waUrl"
+              @blur="saveWaUrl()">
+            <p class="text-xs text-base-content opacity-50 mt-1">La URL se guarda automáticamente en tu navegador</p>
+          </div>
+          <div class="mb-4">
+            <label class="text-sm font-medium mb-1 block">Archivo WhatsApp (.txt o .json)</label>
+            <input type="file" class="file-input file-input-sm file-input-bordered w-full"
+              accept=".txt,.json" x-ref="waFile">
+          </div>
+          <button class="btn btn-primary" :disabled="sending" @click="sendWhatsapp()">
+            <span x-show="!sending">Procesar y Enviar a n8n</span>
+            <span x-show="sending" class="loading loading-spinner loading-xs"></span>
+          </button>
+          <div x-show="waResult" class="mt-4">
+            <label class="text-xs font-medium mb-1 block text-base-content opacity-60">Resultado</label>
+            <pre class="bg-base-200 rounded p-3 text-xs overflow-auto max-h-64 whitespace-pre-wrap" x-text="waResult"></pre>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast toast-top toast-end z-50" x-show="toast.visible" x-transition>
+    <div class="alert" :class="toast.type === 'error' ? 'alert-error' : 'alert-success'">
+      <span x-text="toast.message"></span>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>[x-cloak]{display:none}</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] ?? '';
+const URLS = {
+  create:     "{% url 'chromadb_create' %}",
+  update:     "{% url 'chromadb_update' doc_id='__ID__' %}",
+  delete:     "{% url 'chromadb_delete' doc_id='__ID__' %}",
+  bulkDelete: "{% url 'chromadb_bulk_delete' %}",
+  get:        "{% url 'chromadb_get' doc_id='__ID__' %}",
+  export:     "{% url 'chromadb_export' %}",
+  whatsapp:   "{% url 'chromadb_whatsapp' %}",
+};
+
+function url(key, id) {
+  return id ? URLS[key].replace('__ID__', encodeURIComponent(id)) : URLS[key];
+}
+
+async function apiFetch(method, urlKey, id, body) {
+  const opts = { method, headers: { 'X-CSRFToken': CSRF } };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch(url(urlKey, id), opts);
+  return r.json();
+}
+
+function chromadbApp() {
+  return {
+    tab: 'list',
+    docs: {{ documents_json|safe }},
+    selectedIds: [],
+    deleting: false,
+    saving: false,
+    creating: false,
+    sending: false,
+    importing: false,
+    importProgress: '',
+    categoryFilter: '',
+    textFilter: '',
+    editDoc: null,
+    editForm: { text: '', categoria: '', source: '' },
+    createForm: { text: '', categoria: '', source: '' },
+    waUrl: localStorage.getItem('n8n_wa_url') || '{{ whatsapp_webhook_default|escapejs }}',
+    waResult: '',
+    toast: { visible: false, message: '', type: 'success' },
+
+    get categories() {
+      const cats = [...new Set(this.docs.map(d => d.metadata?.categoria).filter(Boolean))];
+      return cats.sort();
+    },
+
+    get filteredDocs() {
+      return this.docs.filter(d => {
+        if (this.categoryFilter && d.metadata?.categoria !== this.categoryFilter) return false;
+        if (this.textFilter && !d.document.toLowerCase().includes(this.textFilter.toLowerCase())) return false;
+        return true;
+      });
+    },
+
+    showToast(message, type = 'success') {
+      this.toast = { visible: true, message, type };
+      setTimeout(() => this.toast.visible = false, 3000);
+    },
+
+    toggleRow(id, checked) {
+      if (checked) { if (!this.selectedIds.includes(id)) this.selectedIds.push(id); }
+      else { this.selectedIds = this.selectedIds.filter(i => i !== id); }
+    },
+
+    toggleSelectAll(checked) {
+      this.selectedIds = checked ? this.filteredDocs.map(d => d.id) : [];
+    },
+
+    startEdit(doc) {
+      this.editDoc = doc;
+      this.editForm = {
+        text: doc.document,
+        categoria: doc.metadata?.categoria || '',
+        source: doc.metadata?.source || '',
+      };
+    },
+
+    async saveEdit() {
+      if (!this.editDoc) return;
+      this.saving = true;
+      try {
+        const data = await apiFetch('POST', 'update', this.editDoc.id, this.editForm);
+        if (data.ok) {
+          const idx = this.docs.findIndex(d => d.id === this.editDoc.id);
+          if (idx !== -1) {
+            this.docs[idx] = { ...this.docs[idx], document: this.editForm.text, metadata: { categoria: this.editForm.categoria, source: this.editForm.source } };
+          }
+          this.editDoc = null;
+          this.showToast('Embedding actualizado');
+        } else { this.showToast(data.error || 'Error al actualizar', 'error'); }
+      } catch { this.showToast('Error de conexión', 'error'); }
+      this.saving = false;
+    },
+
+    async createEmbedding() {
+      if (!this.createForm.text.trim()) { this.showToast('El texto no puede estar vacío', 'error'); return; }
+      this.creating = true;
+      try {
+        const data = await apiFetch('POST', 'create', null, this.createForm);
+        if (data.ok) {
+          this.docs.push({ id: data.id, document: this.createForm.text, metadata: { categoria: this.createForm.categoria, source: this.createForm.source } });
+          this.createForm = { text: '', categoria: '', source: '' };
+          this.showToast('Embedding creado');
+          this.tab = 'list';
+        } else { this.showToast(data.error || 'Error al crear', 'error'); }
+      } catch { this.showToast('Error de conexión', 'error'); }
+      this.creating = false;
+    },
+
+    async deleteSingle(id) {
+      if (!confirm('¿Eliminar este embedding?')) return;
+      try {
+        const data = await apiFetch('POST', 'delete', id);
+        if (data.ok) {
+          this.docs = this.docs.filter(d => d.id !== id);
+          this.selectedIds = this.selectedIds.filter(i => i !== id);
+          if (this.editDoc?.id === id) this.editDoc = null;
+          this.showToast('Embedding eliminado');
+        } else { this.showToast(data.error || 'Error al eliminar', 'error'); }
+      } catch { this.showToast('Error de conexión', 'error'); }
+    },
+
+    async bulkDelete() {
+      if (!confirm(`¿Eliminar ${this.selectedIds.length} embedding(s)?`)) return;
+      this.deleting = true;
+      try {
+        const data = await apiFetch('POST', 'bulkDelete', null, { ids: this.selectedIds });
+        if (data.ok) {
+          const toRemove = new Set(this.selectedIds);
+          this.docs = this.docs.filter(d => !toRemove.has(d.id));
+          this.selectedIds = [];
+          this.showToast(`${data.deleted} embedding(s) eliminado(s)`);
+          if (data.errors?.length) this.showToast(`${data.errors.length} error(es) al eliminar`, 'error');
+        } else { this.showToast(data.error || 'Error', 'error'); }
+      } catch { this.showToast('Error de conexión', 'error'); }
+      this.deleting = false;
+    },
+
+    exportJson() {
+      window.location.href = URLS.export;
+    },
+
+    async importJson(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      let items;
+      try {
+        items = JSON.parse(await file.text());
+        if (!Array.isArray(items)) { this.showToast('El JSON debe ser un array', 'error'); return; }
+      } catch { this.showToast('JSON inválido', 'error'); return; }
+
+      this.importing = true;
+      let ok = 0;
+      for (let i = 0; i < items.length; i++) {
+        this.importProgress = `Importando ${i + 1}/${items.length}…`;
+        const item = items[i];
+        const body = {
+          text: item.document || item.text || '',
+          categoria: item.metadata?.categoria || item.categoria || '',
+          source: item.metadata?.source || item.source || '',
+          doc_id: item.id || null,
+        };
+        if (!body.text) continue;
+        try {
+          const data = await apiFetch('POST', 'create', null, body);
+          if (data.ok) {
+            this.docs.push({ id: data.id, document: body.text, metadata: { categoria: body.categoria, source: body.source } });
+            ok++;
+          }
+        } catch { /* continue */ }
+      }
+      this.importing = false;
+      this.importProgress = '';
+      this.showToast(`${ok}/${items.length} embeddings importados`);
+      event.target.value = '';
+    },
+
+    saveWaUrl() {
+      localStorage.setItem('n8n_wa_url', this.waUrl);
+    },
+
+    async sendWhatsapp() {
+      if (!this.waUrl.trim()) { this.showToast('Ingresa la URL del webhook', 'error'); return; }
+      const fileInput = this.$refs.waFile;
+      if (!fileInput.files.length) { this.showToast('Selecciona un archivo', 'error'); return; }
+      this.saveWaUrl();
+      this.sending = true;
+      this.waResult = '';
+      try {
+        const fd = new FormData();
+        fd.append('n8n_url', this.waUrl);
+        fd.append('archivo', fileInput.files[0]);
+        const r = await fetch(URLS.whatsapp, { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd });
+        const data = await r.json();
+        if (data.ok) {
+          this.waResult = typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2);
+          this.showToast('Archivo enviado a n8n');
+          fileInput.value = '';
+        } else {
+          this.waResult = data.error || 'Error desconocido';
+          this.showToast(data.error || 'Error', 'error');
+        }
+      } catch (e) { this.waResult = String(e); this.showToast('Error de conexión', 'error'); }
+      this.sending = false;
+    },
+  };
+}
+</script>
+{% endblock %}

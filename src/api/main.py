@@ -32,6 +32,86 @@ async def health():
     return {"status": "healthy"}
 
 
+class DocumentCreate(BaseModel):
+    text: str
+    categoria: Optional[str] = None
+    source: Optional[str] = None
+    doc_id: Optional[str] = None
+
+
+class DocumentUpdate(BaseModel):
+    text: str
+    categoria: Optional[str] = None
+    source: Optional[str] = None
+
+
+@app.get("/collections/{collection_name}/documents")
+async def list_documents(collection_name: str):
+    try:
+        from chromadb_client import get_all_vectors
+        result = get_all_vectors(collection_name)
+        docs = []
+        for i, doc_id in enumerate(result.get("ids", [])):
+            meta = result["metadatas"][i] if i < len(result.get("metadatas", [])) else {}
+            docs.append({
+                "id": doc_id,
+                "document": result["documents"][i] if i < len(result.get("documents", [])) else "",
+                "metadata": meta or {},
+            })
+        return {"collection": collection_name, "count": len(docs), "documents": docs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/collections/{collection_name}/documents", status_code=201)
+async def create_document_endpoint(collection_name: str, request: DocumentCreate):
+    try:
+        from chromadb_client import create_document
+        metadata = {}
+        if request.categoria:
+            metadata["categoria"] = request.categoria
+        if request.source:
+            metadata["source"] = request.source
+        doc_id = create_document(collection_name, request.text, metadata or None, request.doc_id)
+        return {"id": doc_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/collections/{collection_name}/documents/{doc_id}")
+async def get_document_endpoint(collection_name: str, doc_id: str):
+    try:
+        from chromadb_client import get_document
+        return get_document(collection_name, doc_id)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.put("/collections/{collection_name}/documents/{doc_id}")
+async def update_document_endpoint(collection_name: str, doc_id: str, request: DocumentUpdate):
+    try:
+        from chromadb_client import update_document
+        metadata = {}
+        if request.categoria:
+            metadata["categoria"] = request.categoria
+        if request.source:
+            metadata["source"] = request.source
+        update_document(collection_name, doc_id, request.text, metadata or None)
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/collections/{collection_name}/documents/{doc_id}")
+async def delete_document_endpoint(collection_name: str, doc_id: str):
+    try:
+        from chromadb_client import delete_document
+        delete_document(collection_name, doc_id)
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class MMRRetrieveRequest(BaseModel):
     query: str
     k: int = 4
