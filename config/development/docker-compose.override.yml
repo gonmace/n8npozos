@@ -3,10 +3,6 @@
 # Ver: https://docs.docker.com/compose/extends/
 
 services:
-  postgres:
-    ports:
-      - "127.0.0.1:5433:5432"  # Acceso directo para herramientas locales (pgAdmin, psql)
-
   chroma:
     ports:
       - "127.0.0.1:8200:8000"  # Acceso directo para desarrollo local fuera de Docker

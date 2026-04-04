@@ -1,29 +1,11 @@
-volumes: {}
-
 networks:
   pozos:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.19.0.0/16
 
 services:
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: n8npozos-postgres
-    hostname: postgres
-    networks: ['pozos']
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-magoreal}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      POSTGRES_DB: ${POSTGRES_USER:-magoreal}
-    volumes:
-      - ../postgres_storage:/var/lib/postgresql/data
-      - ../scripts/postgres-initdb.sh:/docker-entrypoint-initdb.d/init.sh:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
 
   n8n:
     image: n8nio/n8n:2.9.0
@@ -31,11 +13,13 @@ services:
     hostname: n8n
     networks: ['pozos']
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:${N8N_PORT:-5679}:5678"
     environment:
       DB_TYPE: postgresdb
-      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_HOST: host.docker.internal
       DB_POSTGRESDB_USER: ${POSTGRES_USER}
       DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_POSTGRESDB_DATABASE: n8n
@@ -60,9 +44,6 @@ services:
     volumes:
       - ../n8n_storage:/home/node/.n8n
       - ../shared:/data/shared
-    depends_on:
-      postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:5678/healthz"]
       interval: 30s
@@ -108,10 +89,7 @@ services:
       CHROMA_PORT: 8000
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-large}
-      # POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-      # POSTGRES_PORT: ${POSTGRES_PORT:-5432}
     depends_on:
-      - postgres
       - chroma
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8009/health')"]
@@ -146,6 +124,8 @@ services:
     hostname: django
     networks: ['pozos']
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:${DJANGO_PORT:-8010}:8000"
     environment:
@@ -156,7 +136,7 @@ services:
       DJANGO_DB: ${DJANGO_DB:-n8n_django}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_HOST: postgres
+      DB_HOST: host.docker.internal
       DB_PORT: "5432"
       N8N_API_KEY: ${N8N_API_KEY}
       N8N_URL: http://n8n:5678
@@ -172,8 +152,6 @@ services:
       - ../chats:/app/chats
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      postgres:
-        condition: service_healthy
       n8n:
         condition: service_healthy
       api:

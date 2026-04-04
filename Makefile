@@ -25,9 +25,7 @@ logs: ## Logs  [SVC=n8n|django|api|gradio]
 
 shell: ## Shell en contenedor  SVC=django|api|gradio|n8n|postgres
 	@case "$(SVC)" in \
-		postgres) $(COMPOSE) exec postgres psql \
-			-U $$(grep POSTGRES_USER .env | cut -d= -f2) \
-			-d $$(grep POSTGRES_DB   .env | cut -d= -f2) ;; \
+		postgres) psql -U $$(grep POSTGRES_USER .env | cut -d= -f2) -h localhost -d n8n ;; \
 		n8n)      $(COMPOSE) exec n8n /bin/sh ;; \
 		*)        $(COMPOSE) exec $(SVC) /bin/bash ;; \
 	esac
