@@ -13,23 +13,6 @@ services:
 
 
 
-  gradio:
-    build:
-      context: ..
-      dockerfile: docker/gradio/Dockerfile.dev
-    volumes:
-      - ../src/gradio:/app
-    environment:
-      ENV: development
-      DEBUG: "true"
-      # Forzar uso del nombre del servicio Docker cuando está en contenedor
-      CHROMA_HOST: chroma
-      CHROMA_PORT: 8000
-      # Pasar variables de OpenAI desde .env
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-large}
-    command: python app.py
-
   api:
     build:
       context: ..
