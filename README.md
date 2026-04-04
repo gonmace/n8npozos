@@ -476,10 +476,8 @@ Ver `.env.example` para la lista completa con descripción de cada variable.
 | Variable | Descripción |
 |---|---|
 | `COMPOSE_PROJECT_NAME` | Nombre del proyecto Docker Compose (default: `n8npozos`) |
-| `N8N_TRUST_PROXY` | `true` cuando n8n está detrás de nginx (evita warning X-Forwarded-For) |
 | `DOMAIN` | Dominio público (sin https://) |
 | `N8N_PORT` | Puerto local de n8n (default: 6001) |
-| `GRADIO_PORT` | Puerto local de Gradio (default: 6002) |
 | `API_PORT` | Puerto local de la API (default: 6003) |
 | `DJANGO_PORT` | Puerto local de Django (default: 6004) |
 | `MCP_PORT` | Puerto local del MCP (default: 6005) |
